@@ -47,6 +47,19 @@ Seed demo jalan otomatis saat backend start (`RUN_SEED=true`). Matikan dengan `R
 
 Backend join network Docker `cms-vplus_default` agar bisa resolve hostname Postgres.
 
+### Standalone (VM / tanpa Postgres external)
+
+```bash
+# di server
+git clone https://github.com/herihandoko/sultan-banten.git
+cd sultan-banten
+cp .env.standalone.example .env.standalone   # atau buat dari template
+# set CORS_ORIGINS ke http://<IP-VM>:8080
+docker compose -f docker-compose.standalone.yml --env-file .env.standalone up -d --build
+```
+
+App: `http://<IP>:8080` · API: `http://<IP>:5001`
+
 ### Backend lokal + Postgres Docker
 
 ```bash
