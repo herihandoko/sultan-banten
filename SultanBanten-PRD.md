@@ -1,11 +1,13 @@
 # Product Requirement Document (PRD)
-## SULTAN BANTEN — Sistem Utama Layanan Tanggap Informasi, Manajemen Opini, dan Branding Digital Terpadu
+## SIAGAPIM — Sistem Informasi Analisis Gema Aktual Pimpinan
 
-**Kategori:** Government Crisis Response & Media Engagement Platform  
-**Dokumen Acuan:** Rancangan Aksi Perubahan (RAP) PKA Sultan Banten  
+**Nama sebelumnya:** SULTAN BANTEN  
+**Fokus produk:** Media monitoring isu aktual yang menyangkut pimpinan (pantauan harian)  
+**Kategori:** Government Media Monitoring, Crisis Response & Media Engagement Platform  
+**Dokumen Acuan:** Rancangan Aksi Perubahan (RAP) PKA (historis: Sultan Banten)  
 **Sumber Intelijen:** Mata Bathin — OSINT Media Intelligence Platform  
 **Stack Teknologi:** Python Flask (Backend API) & Vue.js 3 (Frontend)  
-**Status Dokumen:** Final — Siap Pengembangan
+**Status Dokumen:** Final — Siap Pengembangan (rebrand SIAGAPIM)
 
 ---
 
@@ -26,13 +28,13 @@
 
 ## 1. Ringkasan Eksekutif & Latar Belakang
 
-Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten memerlukan **platform aksi dan respons** yang terpadu untuk menindaklanjuti hasil analisis intelijen media secara cepat, terstruktur, dan akuntabel.
+Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten memerlukan **platform media monitoring dan aksi respons** yang terpadu untuk memantau berita/isu aktual yang menyangkut pimpinan setiap hari, serta menindaklanjuti hasil analisis intelijen media secara cepat, terstruktur, dan akuntabel.
 
-**SULTAN BANTEN** adalah platform *crisis response & media engagement* yang berfungsi sebagai **ujung tombak aksi** dari intelligence yang dihasilkan oleh sistem **Mata Bathin** (OSINT Media Intelligence Platform). Jika Mata Bathin adalah "otak" yang mendeteksi, menganalisis, dan memberikan peringatan dini, maka SULTAN BANTEN adalah "tangan" yang bertindak: memvalidasi isu ke OPD, memproduksi konten klarifikasi, mendistribusikan ke media mitra, mengamplifikasi via ASN dan KOL, serta melacak efektivitas respons.
+**SIAGAPIM** (*Sistem Informasi Analisis Gema Aktual Pimpinan*) adalah platform *media monitoring, crisis response & media engagement* yang berfungsi sebagai **ujung tombak pantauan dan aksi** dari intelligence yang dihasilkan oleh sistem **Mata Bathin** (OSINT Media Intelligence Platform). Jika Mata Bathin adalah "otak" yang mendeteksi, menganalisis, dan memberikan peringatan dini, maka SIAGAPIM adalah "tangan" yang bertindak: memantau isu pimpinan, memvalidasi ke OPD, memproduksi konten klarifikasi, mendistribusikan ke media mitra, mengamplifikasi via ASN dan KOL, serta melacak efektivitas respons.
 
 ### 1.1 Pembagian Peran
 
-| Aspek | Mata Bathin (Intel Engine) | SULTAN BANTEN (Action Platform) |
+| Aspek | Mata Bathin (Intel Engine) | SIAGAPIM (Media Monitoring & Action) |
 |---|---|---|
 | **Fungsi utama** | OSINT collection, AI agent analysis, risk scoring, early warning, rekomendasi | Validasi OPD, produksi konten, diseminasi media, amplifikasi ASN/KOL, tracking respons |
 | **Sumber data** | RSS, portal berita, YouTube, media sosial publik | Output intelligence dari Mata Bathin via API |
@@ -434,7 +436,7 @@ MONITORING & EVALUASI
 
 | Istilah | Definisi |
 |---|---|
-| **SULTAN BANTEN** | Sistem Utama Layanan Tanggap Informasi, Manajemen Opini, dan Branding Digital Terpadu |
+| **SULTAN BANTEN / SIAGAPIM** | *(nama sebelumnya SULTAN BANTEN)* Sistem Informasi Analisis Gema Aktual Pimpinan — media monitoring & respons isu pimpinan |
 | **Mata Bathin** | Manajemen Analisis Terpadu Berita, Aktor, Tren, Hoax, Isu, Dan Narasi — platform OSINT Media Intelligence |
 | **Biro Adpim** | Biro Administrasi Pimpinan Setda Provinsi Banten |
 | **SLA** | Service Level Agreement — perjanjian tingkat layanan dengan media mitra |

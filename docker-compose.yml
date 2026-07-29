@@ -1,0 +1,54 @@
+# SIAGAPIM — Docker Compose
+# Memakai PostgreSQL yang sudah jalan (container cms-vplus-postgres-1)
+# di network eksternal cms-vplus_default.
+#
+# Sebelum pertama kali:
+#   docker exec cms-vplus-postgres-1 psql -U postgres -c "CREATE DATABASE sultan_banten;"
+#
+# Jalankan:
+#   docker compose up -d --build
+#
+# App: http://localhost:8080  |  API langsung: http://localhost:5001
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: siagapim-api
+    restart: unless-stopped
+    env_file:
+      - .env.docker
+    environment:
+      RUN_SEED: ${RUN_SEED:-true}
+    ports:
+      - "5001:5001"
+    networks:
+      - sultan
+      - cms-vplus_default
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:5001/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 40s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: siagapim-web
+    restart: unless-stopped
+    ports:
+      - "8080:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - sultan
+
+networks:
+  sultan:
+    driver: bridge
+  cms-vplus_default:
+    external: true

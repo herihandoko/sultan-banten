@@ -1,8 +1,10 @@
-# SULTAN BANTEN
+# SIAGAPIM
 
-Sistem Utama Layanan Tanggap Informasi, Manajemen Opini, dan Branding Digital Terpadu — platform crisis response & media engagement untuk Biro Adpim Setda Provinsi Banten.
+**Sistem Informasi Analisis Gema Aktual Pimpinan**
 
-Action layer dari intelijen **Mata Bathin** (Flask API + Vue.js 3).
+Media monitoring untuk memantau berita dan isu aktual yang menyangkut pimpinan — pantauan harian untuk Biro Adpim Setda Provinsi Banten.
+
+Action layer dari intelijen **Mata Bathin** (Flask API + Vue.js 3). Nama sebelumnya: SULTAN BANTEN.
 
 ## Stack
 
@@ -10,18 +12,53 @@ Action layer dari intelijen **Mata Bathin** (Flask API + Vue.js 3).
 |---|---|
 | Backend | Python Flask, SQLAlchemy, JWT, Flask-Migrate |
 | Frontend | Vue.js 3, Vite, Pinia, Vue Router, Tailwind CSS, Chart.js |
-| Database | SQLite (dev) → PostgreSQL (produksi) |
+| Database | SQLite (dev) / PostgreSQL (Docker & produksi) |
 
 ## Struktur
 
 ```
-sultan-banten/
-├── backend/          # Flask API
-├── frontend/         # Vue.js 3 SPA
-└── SultanBanten-PRD.md
+sultan-banten/          # folder repo (historis)
+├── backend/            # Flask API
+├── frontend/           # Vue.js 3 SPA
+├── docker-compose.yml
+└── SultanBanten-PRD.md # spesifikasi (akan diselaraskan ke SIAGAPIM)
 ```
 
-## Setup cepat
+## Setup dengan Docker (PostgreSQL existing)
+
+Project memakai Postgres yang sudah jalan (`cms-vplus-postgres-1`, port host **5433**).
+
+```bash
+# 1. Pastikan DB aplikasi sudah ada (sekali saja)
+docker exec cms-vplus-postgres-1 \
+  psql -U postgres -c "CREATE DATABASE sultan_banten OWNER postgres;"
+
+# 2. Sesuaikan kredensial di .env.docker jika perlu, lalu build & run
+docker compose up -d --build
+```
+
+| Layanan | URL |
+|---|---|
+| Frontend (nginx) | http://localhost:8080 |
+| API Flask | http://localhost:5001 |
+| Postgres | `cms-vplus-postgres-1:5432` (dari container) / `localhost:5433` (dari host) |
+
+Seed demo jalan otomatis saat backend start (`RUN_SEED=true`). Matikan dengan `RUN_SEED=false` di `.env.docker`.
+
+Backend join network Docker `cms-vplus_default` agar bisa resolve hostname Postgres.
+
+### Backend lokal + Postgres Docker
+
+```bash
+cd backend
+# di .env:
+# DATABASE_URL=postgresql+psycopg2://postgres:secret@127.0.0.1:5433/sultan_banten
+pip install -r requirements.txt
+python seed.py
+python wsgi.py
+```
+
+## Setup cepat (SQLite lokal)
 
 ### Backend
 
@@ -59,12 +96,12 @@ Vite mem-proxy `/api` ke backend di port `5001`.
 | `opd_kes` | `opd123` | Admin OPD Teknis (Dinas Kesehatan) |
 | `media` | `media123` | Admin Media & KOL |
 
-## API inti (milestone setup)
+## API inti
 
 - `GET /api/health`
 - `POST /api/auth/login`
 - `GET /api/auth/me`
-- `GET /api/issues` — Crisis Room
+- `GET /api/issues` — Crisis Room / isu aktual
 - `POST /api/issues` — input manual isu (fallback)
 - `POST /api/mata-bathin/webhook/alert` — ingest alert Mata Bathin
 - `GET /api/mata-bathin/status`
@@ -81,9 +118,8 @@ MATA_BATHIN_API_KEY=...
 
 Jika integrasi belum siap, Crisis Room tetap jalan dengan **input manual**.
 
-## Referensi
-
 ## Dokumentasi
 
-- [Panduan Pengguna (User Manual)](./USER_MANUAL.md) — cara pakai per role & skenario demo
-- [SultanBanten-PRD.md](./SultanBanten-PRD.md) — spesifikasi fitur F.01–F.14 dan rencana 8 minggu
+- [Panduan Pengguna (User Manual)](./USER_MANUAL.md)
+- [Business Process](./BUSINESS_PROCESS.md)
+- [SultanBanten-PRD.md](./SultanBanten-PRD.md) — spesifikasi fitur F.01–F.14 (rebrand SIAGAPIM)

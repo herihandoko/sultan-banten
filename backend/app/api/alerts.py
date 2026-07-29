@@ -70,7 +70,7 @@ def test_alert():
     alert = create_crisis_alert(
         issue=None,
         alert_type="manual",
-        title="TEST ALERT SULTAN BANTEN",
+        title="TEST ALERT SIAGAPIM",
         message=f"Alert uji dari {user.full_name if user else 'system'}. Channel web + WA + Telegram (mock).",
         risk_level="R3",
         severity="high",

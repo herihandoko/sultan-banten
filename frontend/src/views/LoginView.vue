@@ -1,7 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { APP_NAME, APP_VERSION_LABEL } from '../config/app'
+import { APP_NAME, APP_FULL_NAME, APP_TAGLINE, APP_VERSION_LABEL } from '../config/app'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
@@ -34,13 +34,13 @@ async function onSubmit() {
     <div class="relative w-full max-w-md">
       <div class="mb-6 text-center">
         <img
-          src="/logo.png"
-          alt="Sultan Banten"
-          class="mx-auto h-auto w-28 select-none"
+          src="/pavicon.png"
+          :alt="APP_NAME"
+          class="mx-auto h-auto w-24 select-none"
         />
-        <p class="mt-3 text-sm text-banten-navy/70">
-          Sistem Utama Layanan Tanggap Informasi, Manajemen Opini, dan Branding Digital Terpadu
-        </p>
+        <h1 class="mt-4 font-display text-2xl tracking-wide text-banten-navy">{{ APP_NAME }}</h1>
+        <p class="mt-1 text-sm font-medium text-banten-navy/80">{{ APP_FULL_NAME }}</p>
+        <p class="mt-2 text-sm text-banten-navy/65">{{ APP_TAGLINE }}</p>
       </div>
 
       <form

@@ -1,10 +1,12 @@
-# Business Process — SULTAN BANTEN
+# Business Process — SIAGAPIM
 
-Alur proses sesuai [SultanBanten-PRD.md](./SultanBanten-PRD.md) dan implementasi aplikasi saat ini (status isu, konten, validasi, blast, ASN, KOL).
+**Sistem Informasi Analisis Gema Aktual Pimpinan** — media monitoring isu aktual pimpinan (harian).
+
+Alur proses sesuai [SultanBanten-PRD.md](./SultanBanten-PRD.md) (rebrand SIAGAPIM) dan implementasi aplikasi saat ini (status isu, konten, validasi, blast, ASN, KOL).
 
 ---
 
-## 1. Peta konteks (Mata Bathin ↔ SULTAN BANTEN)
+## 1. Peta konteks (Mata Bathin ↔ SIAGAPIM)
 
 ```mermaid
 flowchart LR
@@ -15,7 +17,7 @@ flowchart LR
     SRC --> PIPE --> OUT
   end
 
-  subgraph SB["SULTAN BANTEN — Action Platform"]
+  subgraph SB["SIAGAPIM — Action / Media Monitoring"]
     CR[Crisis Room]
     ACT[Validasi → Konten → Diseminasi → Amplifikasi]
     MON[SLA · Laporan · Dashboard Eksekutif]
@@ -29,7 +31,7 @@ flowchart LR
 | Sisi | Peran |
 |---|---|
 | **Mata Bathin** | Deteksi, skor risiko R0–R5, brief, rekomendasi |
-| **SULTAN BANTEN** | Eksekusi respons: OPD, konten, media, ASN, KOL, arsip, laporan |
+| **SIAGAPIM** | Pantauan & eksekusi respons: OPD, konten, media, ASN, KOL, arsip, laporan |
 
 ---
 
@@ -237,7 +239,7 @@ Dapat berjalan **independen** dari alur kontra-isu (circuit breaker PRD: sistem 
 ```mermaid
 sequenceDiagram
   participant MB as Mata Bathin
-  participant SB as SULTAN BANTEN
+  participant SB as SIAGAPIM
   participant OPD as OPD Teknis
   participant MED as Media Mitra
 
@@ -260,7 +262,7 @@ Dipicu otomatis saat isu berstatus **`disseminated`** atau **`closed`**, dan set
 
 ```mermaid
 mindmap
-  root((SULTAN BANTEN))
+  root((SIAGAPIM))
     Pilar1 Crisis Room
       F01 Crisis Room
       F02 Alert

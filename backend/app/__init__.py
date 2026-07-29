@@ -1,4 +1,4 @@
-"""SULTAN BANTEN — Flask application factory."""
+"""SIAGAPIM — Flask application factory."""
 
 from flask import Flask
 from flask_cors import CORS
@@ -24,6 +24,11 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     @app.get("/api/health")
     def health():
-        return {"status": "ok", "service": "sultan-banten"}
+        return {
+            "status": "ok",
+            "service": "siagapim",
+            "name": "SIAGAPIM",
+            "full_name": "Sistem Informasi Analisis Gema Aktual Pimpinan",
+        }
 
     return app

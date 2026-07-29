@@ -201,7 +201,7 @@ def one_click_blast():
     if not partners:
         return jsonify({"error": "Tidak ada media mitra aktif"}), 400
 
-    subject = f"[SULTAN BANTEN] {content.title}"
+    subject = f"[SIAGAPIM] {content.title}"
     body = content.body or content.title
     if content.media_url:
         body = f"{body}\n\nLampiran: {content.media_url}"

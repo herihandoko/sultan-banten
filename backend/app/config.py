@@ -25,6 +25,11 @@ def _database_url() -> str:
             path = BASE_DIR / path
         path.parent.mkdir(parents=True, exist_ok=True)
         return f"sqlite:///{path}"
+    # Allow plain postgresql:// — SQLAlchemy accepts it with psycopg2 installed
+    if configured.startswith("postgres://"):
+        configured = configured.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif configured.startswith("postgresql://") and "+psycopg2" not in configured:
+        configured = configured.replace("postgresql://", "postgresql+psycopg2://", 1)
     return configured
 
 
@@ -35,6 +40,10 @@ class Config:
 
     SQLALCHEMY_DATABASE_URI = _database_url()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,
+        "pool_recycle": 300,
+    }
 
     CORS_ORIGINS = [
         o.strip()

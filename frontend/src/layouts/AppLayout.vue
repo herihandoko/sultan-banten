@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import { useLocalStorage } from '@vueuse/core'
-import { APP_NAME, APP_VERSION_LABEL } from '../config/app'
+import { APP_NAME, APP_FULL_NAME, APP_VERSION_LABEL } from '../config/app'
 import { useAuthStore } from '../stores/auth'
 import AlertBell from '../components/AlertBell.vue'
 
@@ -130,19 +130,31 @@ watch(
           to="/"
           class="group min-w-0 flex-1 overflow-hidden rounded-xl bg-white shadow-[0_8px_24px_rgba(0,0,0,0.18)] ring-1 ring-white/20 transition hover:shadow-[0_10px_28px_rgba(0,0,0,0.22)]"
           :class="collapsed ? 'lg:w-11 lg:flex-none' : ''"
-          :title="collapsed ? 'Sultan Banten' : undefined"
+          :title="collapsed ? APP_NAME : undefined"
         >
           <div
             class="flex items-center justify-center"
             :class="collapsed ? 'lg:px-1.5 lg:py-2' : 'px-3 pb-2 pt-2.5'"
           >
             <img
-              src="/logo.png"
-              alt="Sultan Banten"
+              src="/pavicon.png"
+              :alt="APP_NAME"
               class="h-auto select-none transition duration-300 group-hover:scale-[1.03]"
-              :class="collapsed ? 'w-8 lg:w-7' : 'w-16'"
+              :class="collapsed ? 'w-8 lg:w-7' : 'w-14'"
             />
           </div>
+          <p
+            class="px-2 pb-2 text-center text-[10px] font-semibold tracking-wide text-banten-navy"
+            :class="collapsed ? 'lg:hidden' : ''"
+          >
+            {{ APP_NAME }}
+          </p>
+          <p
+            class="px-2 pb-2 text-center text-[9px] leading-snug text-banten-navy/55"
+            :class="collapsed ? 'lg:hidden' : ''"
+          >
+            {{ APP_FULL_NAME }}
+          </p>
           <div class="grid h-0.5 grid-cols-3" :class="collapsed ? 'lg:hidden' : ''">
             <span class="bg-[#43A047]" />
             <span class="bg-banten-gold" />

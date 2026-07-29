@@ -70,7 +70,7 @@ def build_feedback_payload(issue: Issue, notes: str | None = None) -> dict:
             ),
             "issue_status": issue.status,
             "notes": notes
-            or f"Feedback otomatis dari SULTAN BANTEN — status {issue.status}",
+            or f"Feedback otomatis dari SIAGAPIM — status {issue.status}",
         },
         "submitted_at": datetime.now(timezone.utc).isoformat(),
     }

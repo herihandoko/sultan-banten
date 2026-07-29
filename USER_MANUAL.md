@@ -1,19 +1,21 @@
-# Panduan Pengguna — SULTAN BANTEN
+# Panduan Pengguna — SIAGAPIM
 
-**Versi aplikasi:** v0.1.1  
+**Nama lengkap:** Sistem Informasi Analisis Gema Aktual Pimpinan  
+**Fokus:** Media monitoring isu aktual yang menyangkut pimpinan (pantauan harian)  
+**Versi aplikasi:** v0.2.0  
 **Instansi:** Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten  
 **Dokumen:** User Manual (penggunaan operasional)
 
 ---
 
-## 1. Apa itu SULTAN BANTEN?
+## 1. Apa itu SIAGAPIM?
 
-**SULTAN BANTEN** (*Sistem Utama Layanan Tanggap Informasi, Manajemen Opini, dan Branding Digital Terpadu*) adalah platform **crisis response & media engagement**.
+**SIAGAPIM** (*Sistem Informasi Analisis Gema Aktual Pimpinan*) adalah platform **media monitoring** untuk memantau berita dan isu aktual yang menyangkut pimpinan setiap hari, dilengkapi alur respons (validasi OPD, konten klarifikasi, diseminasi media, amplifikasi ASN/KOL, dan laporan).
 
 | Sistem | Peran |
 |--------|--------|
 | **Mata Bathin** | “Otak” — deteksi isu, sentimen, early warning (OSINT) |
-| **SULTAN BANTEN** | “Tangan” — validasi OPD, produksi konten, blast media, ASN, KOL, laporan |
+| **SIAGAPIM** | “Tangan” — pantauan harian, validasi OPD, konten, blast media, ASN, KOL, laporan |
 
 Alur ringkas:
 
@@ -21,6 +23,8 @@ Alur ringkas:
 Deteksi isu → Alert → Validasi OPD → Produksi konten → Diseminasi
 (media blast / misi ASN / KOL) → Monitoring & laporan
 ```
+
+> Catatan: nama sebelumnya **SULTAN BANTEN**; fitur modul tetap sama.
 
 ---
 
@@ -62,7 +66,7 @@ Klik tombol **Keluar** di pojok kanan atas.
 - Lonjong **lonceng** (Alert): notifikasi krisis (R3+ / overdue).
 
 ### Footer
-Menampilkan nama aplikasi dan versi (contoh: `SULTAN BANTEN · v0.1.1`).
+Menampilkan nama aplikasi dan versi (contoh: `SIAGAPIM · v0.2.0`).
 
 ---
 
@@ -352,4 +356,4 @@ Setup teknis developer: lihat `README.md`.
 
 ---
 
-*Dokumen ini disusun untuk mendukung operasional dan demo SULTAN BANTEN sebagai action layer Adpim Provinsi Banten.*
+*Dokumen ini disusun untuk mendukung operasional dan demo SIAGAPIM (Sistem Informasi Analisis Gema Aktual Pimpinan) sebagai platform media monitoring Adpim Provinsi Banten.*
