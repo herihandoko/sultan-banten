@@ -1,0 +1,117 @@
+"""Mata Bathin connector — consume alerts and send feedback."""
+
+from __future__ import annotations
+
+import time
+from typing import Any
+
+import requests
+from flask import current_app
+
+from app.extensions import db
+from app.models import Issue, IssueEvidence
+
+
+class MataBathinClient:
+    """REST client with retry + circuit-breaker style fail-open."""
+
+    def __init__(self):
+        self.base_url = (current_app.config.get("MATA_BATHIN_BASE_URL") or "").rstrip("/")
+        self.api_key = current_app.config.get("MATA_BATHIN_API_KEY") or ""
+        self.timeout = current_app.config.get("MATA_BATHIN_TIMEOUT", 10)
+        self.max_retries = current_app.config.get("MATA_BATHIN_MAX_RETRIES", 3)
+
+    def _headers(self) -> dict[str, str]:
+        headers = {"Accept": "application/json", "Content-Type": "application/json"}
+        if self.api_key:
+            headers["Authorization"] = f"Bearer {self.api_key}"
+            headers["X-API-Key"] = self.api_key
+        return headers
+
+    def _request(self, method: str, path: str, **kwargs) -> requests.Response | None:
+        if not self.base_url:
+            return None
+
+        url = f"{self.base_url}{path}"
+        last_error: Exception | None = None
+        for attempt in range(self.max_retries):
+            try:
+                response = requests.request(
+                    method,
+                    url,
+                    headers=self._headers(),
+                    timeout=self.timeout,
+                    **kwargs,
+                )
+                response.raise_for_status()
+                return response
+            except requests.RequestException as exc:
+                last_error = exc
+                time.sleep(2**attempt)
+        current_app.logger.warning("Mata Bathin request failed: %s", last_error)
+        return None
+
+    def health_check(self) -> bool:
+        response = self._request("GET", "/health")
+        return response is not None and response.ok
+
+    def send_feedback(self, payload: dict[str, Any]) -> bool:
+        response = self._request("POST", "/api/v1/feedback", json=payload)
+        return response is not None
+
+
+def ingest_crisis_alert(payload: dict[str, Any]) -> tuple[Issue, bool]:
+    """Upsert Issue from Mata Bathin crisis_alert payload (Lampiran B.1)."""
+    alert_id = payload.get("alert_id")
+    existing = Issue.query.filter_by(mb_alert_id=alert_id).first() if alert_id else None
+
+    risk = payload.get("severity") or payload.get("risk_level") or "R0"
+    assessment = payload.get("risk_assessment") or {}
+
+    if existing:
+        existing.title = payload.get("title") or existing.title
+        existing.summary = payload.get("issue_summary") or existing.summary
+        existing.why_now = payload.get("why_now") or existing.why_now
+        existing.risk_level = risk
+        existing.risk_assessment = assessment
+        existing.recommended_actions = payload.get("recommended_actions")
+        existing.narrative_card = payload.get("narrative_card")
+        issue = existing
+        created = False
+    else:
+        issue = Issue(
+            mb_alert_id=alert_id,
+            title=payload.get("title") or "Alert tanpa judul",
+            summary=payload.get("issue_summary"),
+            why_now=payload.get("why_now"),
+            risk_level=risk,
+            risk_assessment=assessment,
+            recommended_actions=payload.get("recommended_actions"),
+            narrative_card=payload.get("narrative_card"),
+            status="open",
+            source="mata_bathin",
+        )
+        db.session.add(issue)
+        db.session.flush()
+        created = True
+
+    evidence_url = payload.get("evidence_pack_url")
+    if evidence_url and not any(e.url == evidence_url for e in issue.evidence):
+        db.session.add(
+            IssueEvidence(
+                issue_id=issue.id,
+                title="Evidence Pack Mata Bathin",
+                url=evidence_url,
+                source_name="Mata Bathin",
+                evidence_type="other",
+            )
+        )
+
+    from app.services.alerts import maybe_alert_on_issue
+
+    # Fire F.02 alert for R3+ (new or risk elevated)
+    if created or risk in {"R3", "R4", "R5"}:
+        maybe_alert_on_issue(issue, force=created)
+
+    db.session.commit()
+    return issue, created

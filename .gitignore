@@ -1,0 +1,9 @@
+.DS_Store
+.idea/
+.vscode/
+*.log
+backend/.venv/
+backend/instance/*.db
+backend/.env
+frontend/node_modules/
+frontend/dist/
