@@ -11,7 +11,7 @@ const meta = ref(null)
 const page = ref(1)
 const loading = ref(true)
 const error = ref('')
-const filter = ref('waiting')
+const filters = ref({ q: '', status: 'waiting' })
 const activeId = ref(null)
 const responding = ref(false)
 const responseForm = ref({
@@ -38,7 +38,8 @@ async function load() {
   error.value = ''
   try {
     const params = { page: page.value, per_page: 10 }
-    if (filter.value !== 'all') params.status = filter.value
+    if (filters.value.status) params.status = filters.value.status
+    if (filters.value.q) params.q = filters.value.q
     const { data } = await api.get('/validations', { params })
     items.value = data.data || []
     meta.value = data.meta || null
@@ -52,8 +53,13 @@ async function load() {
   }
 }
 
-function setFilter(f) {
-  filter.value = f
+function applyFilters() {
+  page.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = { q: '', status: '' }
   page.value = 1
   load()
 }
@@ -97,24 +103,39 @@ onMounted(load)
           F.03 — Verifikasi data isu ke OPD teknis terkait
         </p>
       </div>
-      <div class="flex gap-1 rounded-md border border-banten-navy/15 bg-white/70 p-1 text-xs">
-        <button
-          v-for="f in [
-            { key: 'waiting', label: 'Waiting' },
-            { key: 'validated', label: 'Validated' },
-            { key: 'rejected', label: 'Rejected' },
-            { key: 'all', label: 'Semua' },
-          ]"
-          :key="f.key"
-          type="button"
-          class="rounded px-3 py-1.5 transition"
-          :class="filter === f.key ? 'bg-banten-navy text-white' : 'text-banten-navy/70 hover:bg-banten-sand'"
-          @click="setFilter(f.key)"
-        >
-          {{ f.label }}
+    </div>
+
+    <form
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="applyFilters"
+    >
+      <div class="grid gap-3 md:grid-cols-3">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="filters.q"
+            type="search"
+            placeholder="Judul isu, nama OPD, catatan..."
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Status</label>
+          <select v-model="filters.status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option value="waiting">Waiting</option>
+            <option value="validated">Validated</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
+          Reset
         </button>
       </div>
-    </div>
+    </form>
 
     <div v-if="loading" class="text-sm text-banten-navy/60">Memuat...</div>
     <div v-else-if="error" class="rounded-md border border-banten-red/30 bg-red-50 px-4 py-3 text-sm text-banten-red">

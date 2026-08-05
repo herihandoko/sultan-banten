@@ -35,6 +35,7 @@ def list_content():
     status = request.args.get("status")
     issue_id = request.args.get("issue_id", type=int)
     content_type = request.args.get("content_type")
+    q = (request.args.get("q") or "").strip()
     query = ContentItem.query
     if status:
         query = query.filter_by(status=status)
@@ -42,6 +43,14 @@ def list_content():
         query = query.filter_by(issue_id=issue_id)
     if content_type:
         query = query.filter_by(content_type=content_type)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                ContentItem.title.ilike(like),
+                ContentItem.body.ilike(like),
+            )
+        )
     query = query.order_by(ContentItem.updated_at.desc())
     return jsonify(paginate(query, lambda i: _content_payload(i, include_issue=True)))
 

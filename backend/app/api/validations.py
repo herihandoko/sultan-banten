@@ -34,6 +34,7 @@ def _validation_payload(item: OpdValidation, include_issue: bool = False) -> dic
 def list_validations():
     user = get_current_user()
     status = request.args.get("status")
+    q = (request.args.get("q") or "").strip()
     query = OpdValidation.query
 
     # OPD admin only sees validations for their OPD (or assigned to them)
@@ -45,6 +46,15 @@ def list_validations():
 
     if status:
         query = query.filter_by(status=status)
+    if q:
+        like = f"%{q}%"
+        query = query.outerjoin(Issue).filter(
+            db.or_(
+                OpdValidation.opd_name.ilike(like),
+                OpdValidation.response_notes.ilike(like),
+                Issue.title.ilike(like),
+            )
+        )
 
     query = query.order_by(OpdValidation.requested_at.desc())
     return jsonify(paginate(query, lambda i: _validation_payload(i, include_issue=True)))

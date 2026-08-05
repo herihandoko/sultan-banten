@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import PaginationBar from '../components/PaginationBar.vue'
+import SearchableSelect from '../components/SearchableSelect.vue'
 
 const auth = useAuthStore()
 const users = ref([])
@@ -16,6 +17,16 @@ const showForm = ref(false)
 const saving = ref(false)
 const formError = ref('')
 const editingId = ref(null)
+const showPassword = ref(false)
+const filters = ref({
+  q: '',
+  role_code: '',
+  active: '',
+})
+
+const opdOptions = computed(() =>
+  opds.value.map((o) => ({ value: o.id, label: o.name })),
+)
 
 const form = ref({
   username: '',
@@ -32,6 +43,7 @@ const needsOpd = computed(() => ['opd_admin', 'asn'].includes(form.value.role_co
 
 function resetForm() {
   editingId.value = null
+  showPassword.value = false
   form.value = {
     username: '',
     email: '',
@@ -48,8 +60,12 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
+    const params = { page: page.value, per_page: 10 }
+    for (const [k, v] of Object.entries(filters.value)) {
+      if (v) params[k] = v
+    }
     const [usersRes, rolesRes, opdsRes] = await Promise.all([
-      api.get('/users', { params: { page: page.value, per_page: 10 } }),
+      api.get('/users', { params }),
       api.get('/users/roles'),
       api.get('/opds', { params: { active: '1', per_page: 200 } }),
     ])
@@ -62,6 +78,17 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function applyFilters() {
+  page.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = { q: '', role_code: '', active: '' }
+  page.value = 1
+  load()
 }
 
 function onPage(p) {
@@ -158,6 +185,44 @@ onMounted(load)
     </div>
 
     <form
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="applyFilters"
+    >
+      <div class="grid gap-3 md:grid-cols-4">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="filters.q"
+            type="search"
+            placeholder="Nama, username, email, OPD..."
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Role</label>
+          <select v-model="filters.role_code" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option v-for="r in roles" :key="r.id" :value="r.code">{{ r.name }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Status</label>
+          <select v-model="filters.active" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option value="1">Aktif</option>
+            <option value="0">Nonaktif</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
+          Reset
+        </button>
+      </div>
+    </form>
+
+    <form
       v-if="showForm && isAdmin"
       class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-5"
       @submit.prevent="save"
@@ -195,14 +260,54 @@ onMounted(load)
           <label class="text-sm font-medium text-banten-navy">
             Password{{ editingId ? ' (opsional)' : '' }}
           </label>
-          <input
-            v-model="form.password"
-            type="password"
-            :required="!editingId"
-            minlength="6"
-            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
-            :placeholder="editingId ? 'Kosongkan jika tidak diubah' : ''"
-          />
+          <div class="relative mt-1">
+            <input
+              v-model="form.password"
+              :type="showPassword ? 'text' : 'password'"
+              :required="!editingId"
+              minlength="6"
+              class="w-full rounded-md border border-banten-navy/20 py-2 pl-3 pr-10 text-sm outline-none focus:border-banten-gold"
+              :placeholder="editingId ? 'Kosongkan jika tidak diubah' : ''"
+            />
+            <button
+              type="button"
+              class="absolute inset-y-0 right-0 flex items-center px-3 text-banten-navy/45 transition hover:text-banten-navy"
+              :aria-label="showPassword ? 'Sembunyikan password' : 'Tampilkan password'"
+              @click="showPassword = !showPassword"
+            >
+              <svg
+                v-if="!showPassword"
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.75"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"
+                />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
+              <svg
+                v-else
+                class="h-4 w-4"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                stroke-width="1.75"
+                aria-hidden="true"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
         <div>
           <label class="text-sm font-medium text-banten-navy">Role</label>
@@ -218,14 +323,13 @@ onMounted(load)
           <label class="text-sm font-medium text-banten-navy">
             OPD{{ needsOpd ? ' (wajib)' : ' (opsional)' }}
           </label>
-          <select
+          <SearchableSelect
             v-model="form.opd_id"
-            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+            :options="opdOptions"
+            placeholder="— pilih OPD —"
+            search-placeholder="Cari OPD..."
             :required="needsOpd"
-          >
-            <option value="">— pilih OPD —</option>
-            <option v-for="o in opds" :key="o.id" :value="o.id">{{ o.name }}</option>
-          </select>
+          />
         </div>
         <div v-if="editingId" class="flex items-center gap-2 pt-6">
           <input id="is_active" v-model="form.is_active" type="checkbox" class="rounded border-banten-navy/30" />

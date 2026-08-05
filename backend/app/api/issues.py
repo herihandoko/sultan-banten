@@ -18,6 +18,8 @@ bp = Blueprint("issues", __name__)
 def list_issues():
     status = request.args.get("status")
     risk_level = request.args.get("risk_level")
+    source = request.args.get("source")
+    q = (request.args.get("q") or "").strip()
     user = get_current_user()
     query = Issue.query
 
@@ -39,6 +41,17 @@ def list_issues():
         query = query.filter_by(status=status)
     if risk_level:
         query = query.filter_by(risk_level=risk_level)
+    if source:
+        query = query.filter_by(source=source)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                Issue.title.ilike(like),
+                Issue.summary.ilike(like),
+                Issue.mb_alert_id.ilike(like),
+            )
+        )
     query = query.order_by(Issue.created_at.desc())
     return jsonify(paginate(query, lambda i: i.to_dict()))
 

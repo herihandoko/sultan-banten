@@ -1,20 +1,19 @@
 <script setup>
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { APP_NAME, APP_FULL_NAME, APP_TAGLINE, APP_VERSION_LABEL } from '../config/app'
+import { useRouter } from 'vue-router'
+import { APP_NAME, APP_FULL_NAME, APP_VERSION_LABEL } from '../config/app'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
-const route = useRoute()
 
-const username = ref('admin')
-const password = ref('admin123')
+const username = ref('')
+const password = ref('')
 
 async function onSubmit() {
   const ok = await auth.login(username.value, password.value)
   if (ok) {
-    router.push(route.query.redirect || '/')
+    router.push('/')
   }
 }
 </script>
@@ -40,7 +39,6 @@ async function onSubmit() {
         />
         <h1 class="mt-4 font-display text-2xl tracking-wide text-banten-navy">{{ APP_NAME }}</h1>
         <p class="mt-1 text-sm font-medium text-banten-navy/80">{{ APP_FULL_NAME }}</p>
-        <p class="mt-2 text-sm text-banten-navy/65">{{ APP_TAGLINE }}</p>
       </div>
 
       <form
@@ -74,10 +72,6 @@ async function onSubmit() {
         >
           {{ auth.loading ? 'Masuk...' : 'Masuk' }}
         </button>
-
-        <p class="mt-4 text-center text-xs text-banten-navy/50">
-          Demo: admin / admin123
-        </p>
       </form>
     </div>
 

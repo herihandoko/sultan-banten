@@ -15,6 +15,12 @@ const mbStatus = ref(null)
 const showCreate = ref(false)
 const creating = ref(false)
 const createError = ref('')
+const filters = ref({
+  q: '',
+  status: '',
+  risk_level: '',
+  source: '',
+})
 const form = ref({
   title: '',
   summary: '',
@@ -40,8 +46,12 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
+    const params = { page: page.value, per_page: 10 }
+    for (const [k, v] of Object.entries(filters.value)) {
+      if (v) params[k] = v
+    }
     const [issuesRes, statusRes] = await Promise.all([
-      api.get('/issues', { params: { page: page.value, per_page: 10 } }),
+      api.get('/issues', { params }),
       api.get('/mata-bathin/status').catch(() => ({ data: null })),
     ])
     issues.value = issuesRes.data.data || []
@@ -52,6 +62,17 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function applyFilters() {
+  page.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = { q: '', status: '', risk_level: '', source: '' }
+  page.value = 1
+  load()
 }
 
 function onPage(p) {
@@ -109,6 +130,53 @@ onMounted(load)
         </button>
       </div>
     </div>
+
+    <form
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="applyFilters"
+    >
+      <div class="grid gap-3 md:grid-cols-4">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="filters.q"
+            type="search"
+            placeholder="Judul, ringkasan, alert ID..."
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Status</label>
+          <select v-model="filters.status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option v-for="s in ['open','validating','producing','approved','disseminated','closed']" :key="s" :value="s">
+              {{ s }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Risk</label>
+          <select v-model="filters.risk_level" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option v-for="r in ['R0','R1','R2','R3','R4','R5']" :key="r" :value="r">{{ r }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Sumber</label>
+          <select v-model="filters.source" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option value="mata_bathin">Mata Bathin</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
+          Reset
+        </button>
+      </div>
+    </form>
 
     <form
       v-if="showCreate"

@@ -35,9 +35,22 @@ def _mission_payload(mission: Mission, user: User | None = None) -> dict:
 @role_required("super_admin", "editor", "asn", "pimpinan", "media_kol_admin")
 def list_missions():
     status = request.args.get("status", "active")
+    q = (request.args.get("q") or "").strip()
+    action_type = request.args.get("action_type")
     query = Mission.query
     if status != "all":
         query = query.filter_by(status=status)
+    if action_type:
+        query = query.filter_by(action_type=action_type)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                Mission.title.ilike(like),
+                Mission.instruction.ilike(like),
+                Mission.target_url.ilike(like),
+            )
+        )
     query = query.order_by(Mission.created_at.desc())
     user = get_current_user()
     return jsonify(paginate(query, lambda m: _mission_payload(m, user)))

@@ -34,6 +34,8 @@ def _parse_date(value):
 def list_agenda():
     status = request.args.get("status")
     theme = request.args.get("theme")
+    channel = request.args.get("channel")
+    q = (request.args.get("q") or "").strip()
     date_from = _parse_date(request.args.get("date_from"))
     date_to = _parse_date(request.args.get("date_to"))
     month = request.args.get("month")  # YYYY-MM
@@ -43,6 +45,17 @@ def list_agenda():
         query = query.filter_by(status=status)
     if theme:
         query = query.filter_by(theme=theme)
+    if channel:
+        query = query.filter_by(channel=channel)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                EditorialAgenda.title.ilike(like),
+                EditorialAgenda.description.ilike(like),
+                EditorialAgenda.target_media.ilike(like),
+            )
+        )
     if month:
         try:
             year, mon = map(int, month.split("-"))

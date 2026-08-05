@@ -15,7 +15,11 @@ const page = ref(1)
 const issues = ref([])
 const loading = ref(true)
 const error = ref('')
-const filter = ref(route.query.status || 'all')
+const filters = ref({
+  q: '',
+  status: route.query.status || '',
+  content_type: '',
+})
 const showCreate = ref(Boolean(route.query.issue_id))
 const creating = ref(false)
 const formError = ref('')
@@ -55,7 +59,9 @@ async function load() {
   error.value = ''
   try {
     const params = { page: page.value, per_page: 10 }
-    if (filter.value !== 'all') params.status = filter.value
+    for (const [k, v] of Object.entries(filters.value)) {
+      if (v) params[k] = v
+    }
     const reqs = [api.get('/content', { params })]
     if (canEdit.value) reqs.push(api.get('/content/issues-ready'))
     const [contentRes, issuesRes] = await Promise.all(reqs)
@@ -69,15 +75,21 @@ async function load() {
   }
 }
 
+function applyFilters() {
+  page.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = { q: '', status: '', content_type: '' }
+  page.value = 1
+  load()
+}
+
 function onPage(p) {
   page.value = p
   load()
 }
-
-watch(filter, () => {
-  page.value = 1
-  load()
-})
 
 watch(
   () => selectedIssue.value,
@@ -130,35 +142,58 @@ onMounted(load)
           F.04 — Produksi rilis, infografis, dan video dengan alur approval
         </p>
       </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <div class="flex gap-1 rounded-md border border-banten-navy/15 bg-white/70 p-1 text-xs">
-          <button
-            v-for="f in [
-              { key: 'all', label: 'Semua' },
-              { key: 'draft', label: 'Draft' },
-              { key: 'in_review', label: 'Review' },
-              { key: 'approved', label: 'Approved' },
-              { key: 'rejected', label: 'Rejected' },
-            ]"
-            :key="f.key"
-            type="button"
-            class="rounded px-3 py-1.5 transition"
-            :class="filter === f.key ? 'bg-banten-navy text-white' : 'text-banten-navy/70 hover:bg-banten-sand'"
-            @click="filter = f.key; page = 1; load()"
-          >
-            {{ f.label }}
-          </button>
+      <button
+        v-if="canEdit"
+        type="button"
+        class="rounded-md bg-banten-navy px-3 py-2 text-xs font-medium text-white hover:bg-banten-navy-dark"
+        @click="showCreate = !showCreate"
+      >
+        {{ showCreate ? 'Tutup' : '+ Buat Konten' }}
+      </button>
+    </div>
+
+    <form
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="applyFilters"
+    >
+      <div class="grid gap-3 md:grid-cols-4">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="filters.q"
+            type="search"
+            placeholder="Judul atau isi konten..."
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
         </div>
-        <button
-          v-if="canEdit"
-          type="button"
-          class="rounded-md bg-banten-navy px-3 py-2 text-xs font-medium text-white hover:bg-banten-navy-dark"
-          @click="showCreate = !showCreate"
-        >
-          {{ showCreate ? 'Tutup' : '+ Buat Konten' }}
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Status</label>
+          <select v-model="filters.status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option value="draft">Draft</option>
+            <option value="in_review">Review</option>
+            <option value="approved">Approved</option>
+            <option value="rejected">Rejected</option>
+            <option value="published">Published</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Tipe</label>
+          <select v-model="filters.content_type" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option value="text_release">Rilis Teks</option>
+            <option value="infographic">Infografis</option>
+            <option value="video">Video</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
+          Reset
         </button>
       </div>
-    </div>
+    </form>
 
     <form
       v-if="showCreate && canEdit"

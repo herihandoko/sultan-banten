@@ -17,6 +17,12 @@ const editingId = ref(null)
 
 const now = new Date()
 const month = ref(`${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`)
+const filters = ref({
+  q: '',
+  status: '',
+  theme: '',
+  channel: '',
+})
 
 const form = ref({
   title: '',
@@ -75,9 +81,15 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const { data } = await api.get('/agenda', {
-      params: { month: month.value, page: page.value, per_page: 20 },
-    })
+    const params = {
+      month: month.value,
+      page: page.value,
+      per_page: 20,
+    }
+    for (const [k, v] of Object.entries(filters.value)) {
+      if (v) params[k] = v
+    }
+    const { data } = await api.get('/agenda', { params })
     items.value = data.data || []
     meta.value = data.meta || null
   } catch (err) {
@@ -85,6 +97,17 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function applyFilters() {
+  page.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = { q: '', status: '', theme: '', channel: '' }
+  page.value = 1
+  load()
 }
 
 function onPage(p) {
@@ -186,6 +209,54 @@ onMounted(() => {
         </button>
       </div>
     </div>
+
+    <form
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="applyFilters"
+    >
+      <div class="grid gap-3 md:grid-cols-4">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="filters.q"
+            type="search"
+            placeholder="Judul, deskripsi, target media..."
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Status</label>
+          <select v-model="filters.status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option v-for="s in ['planned','in_production','ready','published','cancelled']" :key="s" :value="s">
+              {{ s }}
+            </option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Tema</label>
+          <select v-model="filters.theme" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option v-for="(label, key) in themeLabel" :key="key" :value="key">{{ label }}</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Kanal</label>
+          <select v-model="filters.channel" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option value="media">Media</option>
+            <option value="sosial">Sosial</option>
+            <option value="both">Both</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
+          Reset
+        </button>
+      </div>
+    </form>
 
     <form
       v-if="showForm && canManage"

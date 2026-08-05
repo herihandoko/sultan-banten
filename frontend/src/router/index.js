@@ -110,7 +110,7 @@ router.beforeEach(async (to) => {
     await auth.bootstrap()
   }
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    return { name: 'login', query: { redirect: to.fullPath } }
+    return { name: 'login' }
   }
   if (to.meta.guest && auth.isAuthenticated) {
     return defaultHome(auth.user?.role?.code)

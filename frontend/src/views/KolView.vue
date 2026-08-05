@@ -47,6 +47,14 @@ const campaignForm = ref({
   comments: 0,
 })
 const editingCampaignId = ref(null)
+const filters = ref({
+  q: '',
+  active: '',
+  platform: '',
+  contract_status: '',
+  campaign_status: '',
+  budget_status: '',
+})
 
 const canManage = computed(() =>
   ['super_admin', 'media_kol_admin'].includes(auth.user?.role?.code),
@@ -80,10 +88,19 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
+    const partnerParams = { page: partnersPage.value, per_page: 10 }
+    if (filters.value.q) partnerParams.q = filters.value.q
+    if (filters.value.active) partnerParams.active = filters.value.active
+    if (filters.value.platform) partnerParams.platform = filters.value.platform
+    if (filters.value.contract_status) partnerParams.contract_status = filters.value.contract_status
+    const campaignParams = { page: campaignsPage.value, per_page: 10 }
+    if (filters.value.q) campaignParams.q = filters.value.q
+    if (filters.value.campaign_status) campaignParams.status = filters.value.campaign_status
+    if (filters.value.budget_status) campaignParams.budget_status = filters.value.budget_status
     const [pRes, pAllRes, cRes] = await Promise.all([
-      api.get('/kol/partners', { params: { page: partnersPage.value, per_page: 10 } }),
+      api.get('/kol/partners', { params: partnerParams }),
       api.get('/kol/partners', { params: { per_page: 200 } }),
-      api.get('/kol/campaigns', { params: { page: campaignsPage.value, per_page: 10 } }),
+      api.get('/kol/campaigns', { params: campaignParams }),
     ])
     partners.value = pRes.data.data || []
     partnersMeta.value = pRes.data.meta || null
@@ -95,6 +112,26 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function applyFilters() {
+  partnersPage.value = 1
+  campaignsPage.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = {
+    q: '',
+    active: '',
+    platform: '',
+    contract_status: '',
+    campaign_status: '',
+    budget_status: '',
+  }
+  partnersPage.value = 1
+  campaignsPage.value = 1
+  load()
 }
 
 function onPartnersPage(p) {
@@ -246,6 +283,73 @@ onMounted(load)
         </button>
       </div>
     </div>
+
+    <form
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="applyFilters"
+    >
+      <div class="grid gap-3 md:grid-cols-4">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="filters.q"
+            type="search"
+            :placeholder="tab === 'partners' ? 'Nama, handle, topik...' : 'Judul campaign, catatan...'"
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <template v-if="tab === 'partners'">
+          <div>
+            <label class="text-xs font-medium text-banten-navy/70">Platform</label>
+            <select v-model="filters.platform" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+              <option value="">Semua</option>
+              <option v-for="p in ['instagram','tiktok','youtube','twitter','facebook','other']" :key="p" :value="p">
+                {{ p }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-banten-navy/70">Kontrak</label>
+            <select v-model="filters.contract_status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+              <option value="">Semua</option>
+              <option v-for="s in ['prospect','active','expired','terminated']" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-banten-navy/70">Status</label>
+            <select v-model="filters.active" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+              <option value="">Semua</option>
+              <option value="1">Aktif</option>
+              <option value="0">Nonaktif</option>
+            </select>
+          </div>
+        </template>
+        <template v-else>
+          <div>
+            <label class="text-xs font-medium text-banten-navy/70">Status campaign</label>
+            <select v-model="filters.campaign_status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+              <option value="">Semua</option>
+              <option v-for="s in ['planned','in_progress','published','completed','cancelled']" :key="s" :value="s">
+                {{ s }}
+              </option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-banten-navy/70">Budget</label>
+            <select v-model="filters.budget_status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+              <option value="">Semua</option>
+              <option v-for="s in ['planned','approved','paid','cancelled']" :key="s" :value="s">{{ s }}</option>
+            </select>
+          </div>
+        </template>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
+          Reset
+        </button>
+      </div>
+    </form>
 
     <div v-if="loading" class="text-sm text-banten-navy/60">Memuat...</div>
     <div v-else-if="error" class="rounded-md border border-banten-red/30 bg-red-50 px-4 py-3 text-sm text-banten-red">

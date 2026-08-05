@@ -107,26 +107,43 @@ onMounted(load)
       </button>
     </div>
 
-    <div class="mb-4 flex flex-wrap items-center gap-3">
-      <input
-        v-model="q"
-        type="search"
-        placeholder="Cari nama OPD..."
-        class="w-full max-w-sm rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
-        @keyup.enter="search"
-      />
-      <button
-        type="button"
-        class="rounded-md border border-banten-navy/20 px-3 py-2 text-xs text-banten-navy hover:bg-white"
-        @click="search"
-      >
-        Cari
-      </button>
-      <label class="flex items-center gap-2 text-xs text-banten-navy/70">
-        <input v-model="showInactive" type="checkbox" class="rounded" @change="search" />
-        Tampilkan nonaktif
-      </label>
-    </div>
+    <form
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="search"
+    >
+      <div class="grid gap-3 md:grid-cols-3">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="q"
+            type="search"
+            placeholder="Cari nama OPD..."
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Status</label>
+          <select
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+            :value="showInactive ? 'all' : '1'"
+            @change="showInactive = $event.target.value === 'all'; search()"
+          >
+            <option value="1">Aktif saja</option>
+            <option value="all">Termasuk nonaktif</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button
+          type="button"
+          class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy"
+          @click="q = ''; showInactive = false; search()"
+        >
+          Reset
+        </button>
+      </div>
+    </form>
 
     <form
       v-if="showForm"

@@ -35,7 +35,31 @@ def _resolve_opd(data: dict) -> tuple[int | None, str | None, str | None]:
 @jwt_required()
 @role_required("super_admin")
 def list_users():
-    query = User.query.order_by(User.created_at.desc())
+    q = (request.args.get("q") or "").strip()
+    role_code = (request.args.get("role_code") or "").strip()
+    active = request.args.get("active")  # 1 | 0 | omit
+    query = User.query
+    if role_code:
+        role = Role.query.filter_by(code=role_code).first()
+        if role:
+            query = query.filter_by(role_id=role.id)
+        else:
+            query = query.filter_by(role_id=-1)
+    if active == "1":
+        query = query.filter_by(is_active=True)
+    elif active == "0":
+        query = query.filter_by(is_active=False)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                User.username.ilike(like),
+                User.full_name.ilike(like),
+                User.email.ilike(like),
+                User.opd_name.ilike(like),
+            )
+        )
+    query = query.order_by(User.created_at.desc())
     return jsonify(paginate(query, lambda u: u.to_dict()))
 
 

@@ -51,10 +51,28 @@ def _campaign_payload(campaign: KolCampaign) -> dict:
 @jwt_required()
 @role_required("super_admin", "media_kol_admin", "editor", "pimpinan")
 def list_partners():
-    active_only = request.args.get("active") == "1"
+    active = request.args.get("active")  # 1 | 0 | omit
+    platform = request.args.get("platform")
+    contract_status = request.args.get("contract_status")
+    q = (request.args.get("q") or "").strip()
     query = KolPartner.query
-    if active_only:
+    if active == "1":
         query = query.filter_by(is_active=True)
+    elif active == "0":
+        query = query.filter_by(is_active=False)
+    if platform:
+        query = query.filter_by(platform=platform)
+    if contract_status:
+        query = query.filter_by(contract_status=contract_status)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                KolPartner.name.ilike(like),
+                KolPartner.handle.ilike(like),
+                KolPartner.topics.ilike(like),
+            )
+        )
     query = query.order_by(KolPartner.name)
     return jsonify(
         paginate(
@@ -154,9 +172,22 @@ def update_partner(partner_id: int):
 @role_required("super_admin", "media_kol_admin", "editor", "pimpinan")
 def list_campaigns():
     status = request.args.get("status")
+    budget_status = request.args.get("budget_status")
+    q = (request.args.get("q") or "").strip()
     query = KolCampaign.query
     if status:
         query = query.filter_by(status=status)
+    if budget_status:
+        query = query.filter_by(budget_status=budget_status)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                KolCampaign.title.ilike(like),
+                KolCampaign.notes.ilike(like),
+                KolCampaign.deliverable_url.ilike(like),
+            )
+        )
     query = query.order_by(KolCampaign.created_at.desc())
     return jsonify(paginate(query, _campaign_payload))
 

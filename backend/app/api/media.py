@@ -30,10 +30,23 @@ SLA_MINUTES = 60  # PRD: SLA 1 jam
 @jwt_required()
 @role_required("super_admin", "editor", "media_kol_admin", "pimpinan")
 def list_partners():
-    active_only = request.args.get("active") == "1"
+    active = request.args.get("active")  # 1 | 0 | omit
+    q = (request.args.get("q") or "").strip()
     query = MediaPartner.query
-    if active_only:
+    if active == "1":
         query = query.filter_by(is_active=True)
+    elif active == "0":
+        query = query.filter_by(is_active=False)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            db.or_(
+                MediaPartner.name.ilike(like),
+                MediaPartner.editor_name.ilike(like),
+                MediaPartner.coverage_area.ilike(like),
+                MediaPartner.email.ilike(like),
+            )
+        )
     query = query.order_by(MediaPartner.name)
     return jsonify(paginate(query, lambda p: p.to_dict(), default_per_page=10, max_per_page=200))
 
@@ -129,7 +142,20 @@ def deactivate_partner(partner_id: int):
 @jwt_required()
 @role_required("super_admin", "editor", "media_kol_admin", "pimpinan")
 def list_blasts():
-    query = MediaBlastLog.query.order_by(MediaBlastLog.sent_at.desc())
+    status = request.args.get("status")
+    q = (request.args.get("q") or "").strip()
+    query = MediaBlastLog.query
+    if status:
+        query = query.filter_by(status=status)
+    if q:
+        like = f"%{q}%"
+        query = query.outerjoin(ContentItem, MediaBlastLog.content_id == ContentItem.id).filter(
+            db.or_(
+                MediaBlastLog.channel.ilike(like),
+                ContentItem.title.ilike(like),
+            )
+        )
+    query = query.order_by(MediaBlastLog.sent_at.desc())
     return jsonify(paginate(query, lambda b: b.to_dict()))
 
 

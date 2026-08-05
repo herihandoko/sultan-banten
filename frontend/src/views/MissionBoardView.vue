@@ -19,6 +19,11 @@ const saving = ref(false)
 const formError = ref('')
 const joinForm = ref({}) // missionId -> { proof_url, notes }
 const joiningId = ref(null)
+const filters = ref({
+  q: '',
+  status: 'all',
+  action_type: '',
+})
 
 const form = ref({
   title: '',
@@ -55,10 +60,11 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
+    const params = { page: page.value, per_page: 10, status: filters.value.status || 'all' }
+    if (filters.value.q) params.q = filters.value.q
+    if (filters.value.action_type) params.action_type = filters.value.action_type
     const reqs = [
-      api.get('/missions', {
-        params: { status: 'all', page: page.value, per_page: 10 },
-      }),
+      api.get('/missions', { params }),
     ]
     if (canCreate.value) reqs.push(api.get('/missions/issues-options'))
     if (canViewStats.value && tab.value === 'stats') reqs.push(api.get('/missions/stats'))
@@ -82,6 +88,17 @@ async function load() {
 
 function onPage(p) {
   page.value = p
+  load()
+}
+
+function applyFilters() {
+  page.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = { q: '', status: 'all', action_type: '' }
+  page.value = 1
   load()
 }
 
@@ -183,6 +200,46 @@ onMounted(load)
         </button>
       </div>
     </div>
+
+    <form
+      v-if="tab === 'board'"
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="applyFilters"
+    >
+      <div class="grid gap-3 md:grid-cols-4">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="filters.q"
+            type="search"
+            placeholder="Judul, instruksi, URL..."
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Status</label>
+          <select v-model="filters.status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="all">Semua</option>
+            <option value="active">Active</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Aksi</label>
+          <select v-model="filters.action_type" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option v-for="(label, key) in actionLabel" :key="key" :value="key">{{ label }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
+          Reset
+        </button>
+      </div>
+    </form>
 
     <div v-if="loading && tab === 'board'" class="text-sm text-banten-navy/60">Memuat...</div>
     <div v-else-if="error" class="rounded-md border border-banten-red/30 bg-red-50 px-4 py-3 text-sm text-banten-red">

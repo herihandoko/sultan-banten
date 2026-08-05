@@ -46,6 +46,11 @@ const blastForm = ref({
 const blasting = ref(false)
 const blastResult = ref(null)
 const selectAll = ref(true)
+const filters = ref({
+  q: '',
+  active: '',
+  blast_status: '',
+})
 
 const slaForm = ref({
   media_partner_id: '',
@@ -71,10 +76,16 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
+    const partnerParams = { page: partnersPage.value, per_page: 10 }
+    if (filters.value.q) partnerParams.q = filters.value.q
+    if (filters.value.active) partnerParams.active = filters.value.active
+    const blastParams = { page: blastsPage.value, per_page: 10 }
+    if (filters.value.q) blastParams.q = filters.value.q
+    if (filters.value.blast_status) blastParams.status = filters.value.blast_status
     const reqs = [
-      api.get('/media/partners', { params: { page: partnersPage.value, per_page: 10 } }),
+      api.get('/media/partners', { params: partnerParams }),
       api.get('/media/partners', { params: { active: '1', per_page: 200 } }),
-      api.get('/media/blasts', { params: { page: blastsPage.value, per_page: 10 } }),
+      api.get('/media/blasts', { params: blastParams }),
       api.get('/media/sla', { params: { page: slaPage.value, per_page: 10 } }),
       api.get('/media/sla/ranking'),
     ]
@@ -106,6 +117,19 @@ async function load() {
   } finally {
     loading.value = false
   }
+}
+
+function applyFilters() {
+  partnersPage.value = 1
+  blastsPage.value = 1
+  load()
+}
+
+function resetFilters() {
+  filters.value = { q: '', active: '', blast_status: '' }
+  partnersPage.value = 1
+  blastsPage.value = 1
+  load()
 }
 
 function onPartnersPage(p) {
@@ -269,6 +293,48 @@ onMounted(load)
         </button>
       </div>
     </div>
+
+    <form
+      v-if="tab === 'partners' || tab === 'logs'"
+      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      @submit.prevent="applyFilters"
+    >
+      <div class="grid gap-3 md:grid-cols-4">
+        <div class="md:col-span-2">
+          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <input
+            v-model="filters.q"
+            type="search"
+            :placeholder="tab === 'partners' ? 'Nama media, editor, wilayah...' : 'Judul konten, kanal...'"
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <div v-if="tab === 'partners'">
+          <label class="text-xs font-medium text-banten-navy/70">Status mitra</label>
+          <select v-model="filters.active" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option value="1">Aktif</option>
+            <option value="0">Nonaktif</option>
+          </select>
+        </div>
+        <div v-if="tab === 'logs'">
+          <label class="text-xs font-medium text-banten-navy/70">Status blast</label>
+          <select v-model="filters.blast_status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+            <option value="">Semua</option>
+            <option value="sent">Sent</option>
+            <option value="partial">Partial</option>
+            <option value="failed">Failed</option>
+            <option value="pending">Pending</option>
+          </select>
+        </div>
+      </div>
+      <div class="mt-4 flex flex-wrap gap-2">
+        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
+        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
+          Reset
+        </button>
+      </div>
+    </form>
 
     <div v-if="loading" class="text-sm text-banten-navy/60">Memuat...</div>
     <div v-else-if="error" class="rounded-md border border-banten-red/30 bg-red-50 px-4 py-3 text-sm text-banten-red">
