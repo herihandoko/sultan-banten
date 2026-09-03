@@ -19,15 +19,15 @@ async function onSubmit() {
 </script>
 
 <template>
-  <div class="relative flex min-h-screen flex-col items-center justify-center px-4 pb-16 pt-8">
+  <div class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pb-16 pt-8">
     <div
-      class="pointer-events-none absolute inset-0 opacity-40"
-      style="
-        background-image:
-          linear-gradient(rgba(27, 58, 92, 0.05) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(27, 58, 92, 0.05) 1px, transparent 1px);
-        background-size: 32px 32px;
-      "
+      class="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
+      style="background-image: url('/siagapim_login.png')"
+      aria-hidden="true"
+    />
+    <div
+      class="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/55 via-white/25 to-banten-navy/35"
+      aria-hidden="true"
     />
 
     <div class="relative w-full max-w-md">
@@ -35,14 +35,16 @@ async function onSubmit() {
         <img
           src="/pavicon.png"
           :alt="APP_NAME"
-          class="mx-auto h-auto w-24 select-none"
+          class="mx-auto h-auto w-24 select-none drop-shadow-sm"
         />
-        <h1 class="mt-4 font-display text-2xl tracking-wide text-banten-navy">{{ APP_NAME }}</h1>
-        <p class="mt-1 text-sm font-medium text-banten-navy/80">{{ APP_FULL_NAME }}</p>
+        <h1 class="mt-4 font-display text-2xl tracking-wide text-banten-navy drop-shadow-sm">
+          {{ APP_NAME }}
+        </h1>
+        <p class="mt-1 text-sm font-medium text-banten-navy/85">{{ APP_FULL_NAME }}</p>
       </div>
 
       <form
-        class="rounded-xl border border-banten-navy/10 bg-white/90 p-6 shadow-sm backdrop-blur"
+        class="rounded-xl border border-banten-navy/10 bg-white/95 p-6 shadow-lg backdrop-blur-sm"
         @submit.prevent="onSubmit"
       >
         <label class="block text-sm font-medium text-banten-navy">Username</label>
@@ -75,7 +77,7 @@ async function onSubmit() {
       </form>
     </div>
 
-    <footer class="absolute inset-x-0 bottom-0 py-4 text-center text-xs text-banten-navy/45">
+    <footer class="absolute inset-x-0 bottom-0 py-4 text-center text-xs text-white/80">
       {{ APP_NAME }} · {{ APP_VERSION_LABEL }}
     </footer>
   </div>

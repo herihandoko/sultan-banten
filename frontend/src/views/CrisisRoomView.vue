@@ -4,6 +4,10 @@ import { RouterLink } from 'vue-router'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import PaginationBar from '../components/PaginationBar.vue'
+import RiskBadge from '../components/RiskBadge.vue'
+import IssueStatusBadge from '../components/IssueStatusBadge.vue'
+import { RISK_LEVELS, riskOptionLabel, riskTitle } from '../config/risk'
+import { ISSUE_STATUSES, issueStatusOptionLabel } from '../config/issueStatus'
 
 const auth = useAuthStore()
 const issues = ref([])
@@ -11,7 +15,6 @@ const meta = ref(null)
 const page = ref(1)
 const loading = ref(true)
 const error = ref('')
-const mbStatus = ref(null)
 const showCreate = ref(false)
 const creating = ref(false)
 const createError = ref('')
@@ -28,15 +31,6 @@ const form = ref({
   risk_level: 'R2',
 })
 
-const riskColor = {
-  R0: 'bg-slate-200 text-slate-700',
-  R1: 'bg-sky-100 text-sky-800',
-  R2: 'bg-amber-100 text-amber-800',
-  R3: 'bg-orange-100 text-orange-800',
-  R4: 'bg-red-100 text-red-800',
-  R5: 'bg-banten-red text-white',
-}
-
 const canCreate = computed(() => {
   const code = auth.user?.role?.code
   return code === 'super_admin' || code === 'editor'
@@ -50,13 +44,9 @@ async function load() {
     for (const [k, v] of Object.entries(filters.value)) {
       if (v) params[k] = v
     }
-    const [issuesRes, statusRes] = await Promise.all([
-      api.get('/issues', { params }),
-      api.get('/mata-bathin/status').catch(() => ({ data: null })),
-    ])
+    const issuesRes = await api.get('/issues', { params })
     issues.value = issuesRes.data.data || []
     meta.value = issuesRes.data.meta || null
-    mbStatus.value = statusRes.data
   } catch (err) {
     error.value = err.response?.data?.error || 'Gagal memuat data Crisis Room'
   } finally {
@@ -109,17 +99,6 @@ onMounted(load)
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
-        <div
-          class="rounded-md border px-3 py-2 text-xs"
-          :class="
-            mbStatus?.enabled
-              ? 'border-emerald-300 bg-emerald-50 text-emerald-800'
-              : 'border-amber-300 bg-amber-50 text-amber-900'
-          "
-        >
-          Mata Bathin:
-          {{ mbStatus?.enabled ? (mbStatus.reachable ? 'Terhubung' : 'Enabled (unreachable)') : 'Mode manual' }}
-        </div>
         <button
           v-if="canCreate"
           type="button"
@@ -149,16 +128,20 @@ onMounted(load)
           <label class="text-xs font-medium text-banten-navy/70">Status</label>
           <select v-model="filters.status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
             <option value="">Semua</option>
-            <option v-for="s in ['open','validating','producing','approved','disseminated','closed']" :key="s" :value="s">
-              {{ s }}
+            <option v-for="s in ISSUE_STATUSES" :key="s" :value="s" :title="issueStatusOptionLabel(s)">
+              {{ issueStatusOptionLabel(s) }}
             </option>
           </select>
         </div>
         <div>
-          <label class="text-xs font-medium text-banten-navy/70">Risk</label>
+          <label class="text-xs font-medium text-banten-navy/70" :title="RISK_LEVELS.map(riskTitle).join(' · ')">
+            Risk level
+          </label>
           <select v-model="filters.risk_level" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
             <option value="">Semua</option>
-            <option v-for="r in ['R0','R1','R2','R3','R4','R5']" :key="r" :value="r">{{ r }}</option>
+            <option v-for="r in RISK_LEVELS" :key="r" :value="r" :title="riskTitle(r)">
+              {{ riskOptionLabel(r) }}
+            </option>
           </select>
         </div>
         <div>
@@ -214,8 +197,11 @@ onMounted(load)
             v-model="form.risk_level"
             class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm outline-none focus:border-banten-gold"
           >
-            <option v-for="r in ['R0','R1','R2','R3','R4','R5']" :key="r" :value="r">{{ r }}</option>
+            <option v-for="r in RISK_LEVELS" :key="r" :value="r" :title="riskTitle(r)">
+              {{ riskOptionLabel(r) }}
+            </option>
           </select>
+          <p class="mt-1 text-xs text-banten-navy/55">{{ riskTitle(form.risk_level) }}</p>
         </div>
       </div>
       <p v-if="createError" class="mt-3 text-sm text-banten-red">{{ createError }}</p>
@@ -251,24 +237,14 @@ onMounted(load)
         <div class="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div class="flex flex-wrap items-center gap-2">
-              <span
-                class="rounded px-2 py-0.5 text-xs font-semibold"
-                :class="riskColor[issue.risk_level] || riskColor.R0"
-              >
-                {{ issue.risk_level }}
-              </span>
-              <span class="text-xs uppercase tracking-wide text-banten-navy/45">
-                {{ issue.source }}
-              </span>
+              <RiskBadge :level="issue.risk_level" show-label />
             </div>
             <h2 class="mt-2 font-display text-xl text-banten-navy">{{ issue.title }}</h2>
             <p class="mt-1 line-clamp-2 text-sm text-banten-navy/70">
               {{ issue.summary || issue.why_now || 'Tidak ada ringkasan' }}
             </p>
           </div>
-          <span class="rounded-md bg-banten-sand px-2.5 py-1 text-xs font-medium text-banten-navy">
-            {{ issue.status }}
-          </span>
+          <IssueStatusBadge :status="issue.status" />
         </div>
       </RouterLink>
     </div>

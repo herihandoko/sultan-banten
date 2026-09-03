@@ -3,6 +3,10 @@ import { onMounted, ref, watch } from 'vue'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import PaginationBar from '../components/PaginationBar.vue'
+import RiskBadge from '../components/RiskBadge.vue'
+import IssueStatusBadge from '../components/IssueStatusBadge.vue'
+import { RISK_LEVELS, riskOptionLabel, riskTitle } from '../config/risk'
+import { ISSUE_STATUSES, issueStatusOptionLabel } from '../config/issueStatus'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,15 +29,6 @@ const filters = ref({
   date_from: route.query.date_from || '',
   date_to: route.query.date_to || '',
 })
-
-const riskColor = {
-  R0: 'bg-slate-200 text-slate-700',
-  R1: 'bg-sky-100 text-sky-800',
-  R2: 'bg-amber-100 text-amber-800',
-  R3: 'bg-orange-100 text-orange-800',
-  R4: 'bg-red-100 text-red-800',
-  R5: 'bg-banten-red text-white',
-}
 
 async function search() {
   loading.value = true
@@ -134,16 +129,20 @@ watch(
           <label class="text-xs font-medium text-banten-navy/70">Status isu</label>
           <select v-model="filters.status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
             <option value="">Semua</option>
-            <option v-for="s in ['open','validating','producing','approved','disseminated','closed']" :key="s" :value="s">
-              {{ s }}
+            <option v-for="s in ISSUE_STATUSES" :key="s" :value="s" :title="issueStatusOptionLabel(s)">
+              {{ issueStatusOptionLabel(s) }}
             </option>
           </select>
         </div>
         <div>
-          <label class="text-xs font-medium text-banten-navy/70">Risk</label>
+          <label class="text-xs font-medium text-banten-navy/70" :title="RISK_LEVELS.map(riskTitle).join(' · ')">
+            Risk level
+          </label>
           <select v-model="filters.risk_level" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
             <option value="">Semua</option>
-            <option v-for="r in ['R0','R1','R2','R3','R4','R5']" :key="r" :value="r">{{ r }}</option>
+            <option v-for="r in RISK_LEVELS" :key="r" :value="r" :title="riskTitle(r)">
+              {{ riskOptionLabel(r) }}
+            </option>
           </select>
         </div>
         <div>
@@ -199,13 +198,8 @@ watch(
             <div class="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <div class="flex flex-wrap items-center gap-2">
-                  <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="riskColor[issue.risk_level]">
-                    {{ issue.risk_level }}
-                  </span>
-                  <span class="rounded-md bg-banten-sand px-2 py-0.5 text-xs text-banten-navy">
-                    {{ issue.status }}
-                  </span>
-                  <span class="text-xs uppercase text-banten-navy/45">{{ issue.source }}</span>
+                  <RiskBadge :level="issue.risk_level" show-label />
+                  <IssueStatusBadge :status="issue.status" />
                 </div>
                 <h3 class="mt-2 font-display text-xl text-banten-navy">
                   <RouterLink :to="`/issues/${issue.id}`" class="hover:text-banten-gold">
@@ -270,7 +264,7 @@ watch(
             <p class="mt-2 font-display text-lg text-banten-navy">{{ c.title }}</p>
             <p class="mt-1 text-xs text-banten-navy/55">
               Isu: {{ c.issue_title || `#${c.issue_id}` }}
-              <span v-if="c.issue_risk_level"> · {{ c.issue_risk_level }}</span>
+              <RiskBadge v-if="c.issue_risk_level" :level="c.issue_risk_level" class="ml-1.5 align-middle" />
             </p>
           </RouterLink>
         </div>

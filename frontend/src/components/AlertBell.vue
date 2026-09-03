@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../services/api'
+import RiskBadge from './RiskBadge.vue'
 
 const router = useRouter()
 const open = ref(false)
@@ -177,11 +178,14 @@ const badge = computed(() => (unreadCount.value > 9 ? '9+' : String(unreadCount.
           @click="markRead(a)"
         >
           <div class="flex items-center gap-2">
+            <RiskBadge v-if="a.risk_level" :level="a.risk_level" />
             <span
+              v-else
               class="rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase"
               :class="severityClass[a.severity] || severityClass.high"
+              :title="a.severity"
             >
-              {{ a.risk_level || a.severity }}
+              {{ a.severity }}
             </span>
             <span v-if="!a.is_read" class="h-1.5 w-1.5 rounded-full bg-banten-red" />
           </div>

@@ -320,11 +320,104 @@ Status singkat: *(Done)* sudah ada di aplikasi · *(In Progress)* parsial · *(T
 
 ---
 
+## Epic F — UX polish & operasional produksi (3–5 Agu 2026)
+
+### T-027 · Mapping domain produksi SIAGAPIM
+| Field | Isi |
+|---|---|
+| **Judul Task** | Mapping `siagapim.bantenprov.go.id` → app Docker di VM |
+| **Deskripsi** | Membuka akses publik lewat domain resmi (bukan hanya IP:port). Meliputi: (1) site nginx host proxy ke `127.0.0.1:8080` (SPA + `/api`); (2) CORS backend memasukkan origin `https://siagapim.bantenprov.go.id`; (3) template config di `deploy/nginx-siagapim.conf`; (4) verifikasi HTTPS (terminasi OpenResty di depan) + `/api/health`. **Selesai jika:** login page & health API bisa diakses dari domain publik. |
+| **Prioritas** | P0 |
+| **Rentang Tanggal** | 3 Agustus 2026 |
+| **Komentar** | Live di https://siagapim.bantenprov.go.id — host nginx HTTP:80, SSL di OpenResty. |
+| **Sumber Informasi** | Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten |
+| **Status** | Done |
+
+### T-028 · Rapikan halaman login (redirect & default credentials)
+| Field | Isi |
+|---|---|
+| **Judul Task** | Bersihkan URL login & default form credentials |
+| **Deskripsi** | Menghilangkan kebiasaan demo yang tidak aman di layar login. Meliputi: (1) hapus query `?redirect=/` dari guard router; (2) setelah login selalu ke home sesuai role; (3) kosongkan default username/password di form; (4) hapus tagline demo yang mengganggu branding. **Selesai jika:** URL bersih `/login` dan field login kosong (autofill browser boleh terpisah). |
+| **Prioritas** | P1 |
+| **Rentang Tanggal** | 3 Agustus 2026 |
+| **Komentar** | Deployed ke prod. |
+| **Sumber Informasi** | Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten |
+| **Status** | Done |
+
+### T-029 · Layout sticky sidebar & header
+| Field | Isi |
+|---|---|
+| **Judul Task** | Sidebar + header tetap saat konten di-scroll |
+| **Deskripsi** | Memperbaiki UX navigasi agar shell aplikasi tidak ikut scroll bersama konten panjang. Meliputi: (1) root layout `h-dvh` + overflow hidden; (2) sidebar sticky/tinggi viewport; (3) hanya `main` yang `overflow-y-auto`; (4) header & footer tetap di kolom konten. **Selesai jika:** saat scroll daftar panjang, menu kiri dan header user tetap diam. |
+| **Prioritas** | P1 |
+| **Rentang Tanggal** | 3 Agustus 2026 |
+| **Komentar** | Applied di `AppLayout.vue`. |
+| **Sumber Informasi** | Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten |
+| **Status** | Done |
+
+### T-030 · Form Users: show/hide password + OPD searchable
+| Field | Isi |
+|---|---|
+| **Judul Task** | UX form manajemen user (password toggle & OPD searchable) |
+| **Deskripsi** | Memudahkan input user saat daftar OPD panjang. Meliputi: (1) ikon mata show/hide di field password; (2) komponen `SearchableSelect` untuk pilih OPD dengan pencarian teks; (3) validasi required tetap jalan untuk role yang wajib OPD. **Selesai jika:** admin bisa cari OPD dengan ketik nama dan melihat/menyembunyikan password saat isi form. |
+| **Prioritas** | P2 |
+| **Rentang Tanggal** | 3 Agustus 2026 |
+| **Komentar** | Komponen `SearchableSelect.vue` reusable. |
+| **Sumber Informasi** | Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten |
+| **Status** | Done |
+
+### T-031 · Grouping menu sidebar
+| Field | Isi |
+|---|---|
+| **Judul Task** | Kelompokkan navigasi sidebar per domain kerja |
+| **Deskripsi** | Menata menu agar lebih mudah dipindai (bukan daftar flat panjang). Grup: **Utama**, **Crisis Room**, **Media & Amplifikasi**, **Laporan**, **Administrasi**. Meliputi: (1) struktur `navGroups` di layout; (2) label grup + divider saat sidebar collapsed; (3) filter item per role tetap, grup kosong disembunyikan. **Selesai jika:** super admin melihat menu tergrup, role terbatas hanya melihat grup yang relevan. |
+| **Prioritas** | P2 |
+| **Rentang Tanggal** | 5 Agustus 2026 |
+| **Komentar** | Sesuai pilar PRD (Crisis Room / Media Hub / Amplifikasi). |
+| **Sumber Informasi** | Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten |
+| **Status** | Done |
+
+### T-032 · Scrollbar konsisten (Windows / Firefox)
+| Field | Isi |
+|---|---|
+| **Judul Task** | Rapikan tampilan scrollbar lintas OS/browser |
+| **Deskripsi** | Scrollbar default Windows/Firefox terlihat tebal dibanding Mac overlay. Meliputi: (1) CSS global `scrollbar-width: thin` + warna thumb; (2) webkit scrollbar tipis rounded; (3) varian gelap untuk sidebar navy. **Selesai jika:** scrollbar di Firefox/Windows terlihat tipis dan selaras brand, tanpa mengganggu Mac. |
+| **Prioritas** | P3 |
+| **Rentang Tanggal** | 5 Agustus 2026 |
+| **Komentar** | Di `frontend/src/style.css`. |
+| **Sumber Informasi** | Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten |
+| **Status** | Done |
+
+### T-033 · Filter list di setiap menu (pola Arsip)
+| Field | Isi |
+|---|---|
+| **Judul Task** | Panel filter seragam di semua menu list |
+| **Deskripsi** | Menyamakan kemampuan cari/filter seperti di Arsip ke modul lain. Meliputi: (1) panel filter (kata kunci + field relevan + Cari/Reset) di Crisis Room, Validasi OPD, Hub Konten, Media Hub, Agenda, Mission Board, KOL, Users, Master OPD; (2) perluasan query API (`q`, status, risk, source, role, platform, dll.); (3) Dashboard/Eksekutif/Laporan dikecualikan (bukan list operasional). **Selesai jika:** tiap list utama bisa difilter tanpa reload full page manual di luar form filter. |
+| **Prioritas** | P1 |
+| **Rentang Tanggal** | 5 Agustus 2026 |
+| **Komentar** | Backend + frontend sudah di-wire; deployed ke prod. |
+| **Sumber Informasi** | Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten |
+| **Status** | Done |
+
+### T-034 · Script deploy produksi dari laptop
+| Field | Isi |
+|---|---|
+| **Judul Task** | Automasi deploy lokal → VM produksi |
+| **Deskripsi** | Supaya deploy tidak manual SSH/scp berulang. Meliputi: (1) script `deploy/deploy_prod.py` (rsync + `docker compose` rebuild + health check); (2) konfigurasi rahasia di `deploy/.env.deploy` (gitignore); (3) contoh `deploy/.env.deploy.example`; (4) opsi `--dry-run`, `--skip-sync`, `--health-only`. **Selesai jika:** dari laptop cukup `python3 deploy/deploy_prod.py` dan `/api/health` prod return OK. |
+| **Prioritas** | P1 |
+| **Rentang Tanggal** | 5 Agustus 2026 |
+| **Komentar** | Sudah dipakai deploy ke `10.249.101.43` / siagapim.bantenprov.go.id. |
+| **Sumber Informasi** | Biro Administrasi Pimpinan (Adpim) Setda Provinsi Banten |
+| **Status** | Done |
+
+---
+
 ## Ringkasan timeline (mulai 1 Agustus 2026)
 
 | Periode | Fokus |
 |---|---|
 | **1–7 Agu** | Fondasi, Docker/Postgres, rebrand, pagination |
+| **3–5 Agu** | Domain prod, UX shell/login, filter list, script deploy *(Epic F)* |
 | **8–21 Agu** | Crisis Room F.01–F.05, Master OPD, start integrasi MB |
 | **22 Agu – 5 Sep** | Media Hub F.06–F.09, ASN/KOL F.10–F.13 |
 | **1–12 Sep** | Dashboard eksekutif F.14, laporan, feedback MB |

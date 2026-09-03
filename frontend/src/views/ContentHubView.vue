@@ -4,6 +4,7 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import PaginationBar from '../components/PaginationBar.vue'
+import { riskOptionLabel } from '../config/risk'
 
 const auth = useAuthStore()
 const route = useRoute()
@@ -211,7 +212,7 @@ onMounted(load)
           >
             <option value="" disabled>— pilih isu —</option>
             <option v-for="i in issues" :key="i.id" :value="i.id">
-              {{ i.risk_level }} · {{ i.title }} ({{ i.status }})
+              {{ riskOptionLabel(i.risk_level) }} · {{ i.title }} ({{ i.status }})
             </option>
           </select>
         </div>

@@ -3,6 +3,8 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
+import RiskBadge from '../components/RiskBadge.vue'
+import IssueStatusBadge from '../components/IssueStatusBadge.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -19,15 +21,6 @@ const form = ref({
   assigned_to: '',
   request_notes: '',
 })
-
-const riskColor = {
-  R0: 'bg-slate-200 text-slate-700',
-  R1: 'bg-sky-100 text-sky-800',
-  R2: 'bg-amber-100 text-amber-800',
-  R3: 'bg-orange-100 text-orange-800',
-  R4: 'bg-red-100 text-red-800',
-  R5: 'bg-banten-red text-white',
-}
 
 const statusColor = {
   waiting: 'bg-amber-100 text-amber-800',
@@ -104,13 +97,8 @@ onMounted(load)
       <div class="mt-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div class="flex flex-wrap items-center gap-2">
-            <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="riskColor[issue.risk_level]">
-              {{ issue.risk_level }}
-            </span>
-            <span class="rounded-md bg-banten-sand px-2.5 py-1 text-xs font-medium text-banten-navy">
-              {{ issue.status }}
-            </span>
-            <span class="text-xs uppercase text-banten-navy/45">{{ issue.source }}</span>
+            <RiskBadge :level="issue.risk_level" show-label />
+            <IssueStatusBadge :status="issue.status" />
           </div>
           <h1 class="mt-2 font-display text-3xl text-banten-navy">{{ issue.title }}</h1>
         </div>

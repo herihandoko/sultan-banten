@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import PaginationBar from '../components/PaginationBar.vue'
+import { riskOptionLabel } from '../config/risk'
 
 const auth = useAuthStore()
 const tab = ref('board') // board | stats
@@ -306,7 +307,9 @@ onMounted(load)
             <label class="text-sm font-medium text-banten-navy">Isu terkait (opsional)</label>
             <select v-model="form.issue_id" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
               <option value="">— tidak terkait —</option>
-              <option v-for="i in issues" :key="i.id" :value="i.id">{{ i.risk_level }} · {{ i.title }}</option>
+              <option v-for="i in issues" :key="i.id" :value="i.id">
+                {{ riskOptionLabel(i.risk_level) }} · {{ i.title }}
+              </option>
             </select>
           </div>
         </div>

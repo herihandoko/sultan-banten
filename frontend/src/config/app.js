@@ -1,5 +1,5 @@
 /** Application metadata — bump with releases */
-export const APP_NAME = 'SIAGAPIM'
+export const APP_NAME = 'SIAGAPIM BANTEN'
 export const APP_FULL_NAME =
   'Sistem Informasi Analisis Gema Aktual Pimpinan'
 export const APP_TAGLINE =

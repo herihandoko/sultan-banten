@@ -126,7 +126,7 @@ onMounted(load)
   <div>
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-display text-3xl text-banten-navy">Dashboard SIAGAPIM</h1>
+        <h1 class="font-display text-3xl text-banten-navy">Dashboard SIAGAPIM BANTEN</h1>
         <p class="mt-1 text-sm text-banten-navy/65">
           Media monitoring isu aktual yang menyangkut pimpinan — pantauan harian
         </p>

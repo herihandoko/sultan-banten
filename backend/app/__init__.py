@@ -27,7 +27,7 @@ def create_app(config_class: type[Config] = Config) -> Flask:
         return {
             "status": "ok",
             "service": "siagapim",
-            "name": "SIAGAPIM",
+            "name": "SIAGAPIM BANTEN",
             "full_name": "Sistem Informasi Analisis Gema Aktual Pimpinan",
         }
 

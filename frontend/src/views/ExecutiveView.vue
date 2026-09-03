@@ -12,6 +12,10 @@ import {
   Tooltip,
 } from 'chart.js'
 import api from '../services/api'
+import RiskBadge from '../components/RiskBadge.vue'
+import RiskLegend from '../components/RiskLegend.vue'
+import IssueStatusBadge from '../components/IssueStatusBadge.vue'
+import { riskMeta, riskOptionLabel } from '../config/risk'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Legend)
 
@@ -49,11 +53,48 @@ const riskChart = computed(() => {
       {
         label: 'Jumlah isu',
         data: rows.map((r) => r.count),
-        backgroundColor: ['#94a3b8', '#38bdf8', '#fbbf24', '#fb923c', '#f87171', brand.red],
+        backgroundColor: rows.map((r) => riskMeta(r.level).chartColor),
       },
     ],
   }
 })
+
+const riskChartOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        title(items) {
+          const level = items[0]?.label
+          return level ? riskOptionLabel(level) : ''
+        },
+        afterTitle(items) {
+          const level = items[0]?.label
+          return level ? riskMeta(level).description : ''
+        },
+      },
+    },
+  },
+  scales: {
+    x: {
+      ticks: {
+        callback(value) {
+          const label = this.getLabelForValue(value)
+          return label
+        },
+        font: { size: 11 },
+      },
+      grid: { display: false },
+    },
+    y: {
+      beginAtZero: true,
+      ticks: { precision: 0, font: { size: 11 } },
+      grid: { color: 'rgba(27, 58, 92, 0.06)' },
+    },
+  },
+}
 
 const asnChart = computed(() => {
   const rows = data.value?.asn_by_opd || []
@@ -177,8 +218,14 @@ onMounted(load)
       <section class="mb-6 grid gap-4 lg:grid-cols-3">
         <div class="rounded-xl border border-banten-navy/10 bg-white/80 p-4 lg:col-span-1">
           <h3 class="font-display text-lg text-banten-navy">Distribusi Risiko</h3>
-          <div class="mt-3 h-56">
-            <Bar :data="riskChart" :options="chartOptions" />
+          <div class="mt-3 h-48">
+            <Bar :data="riskChart" :options="riskChartOptions" />
+          </div>
+          <div class="mt-3 border-t border-banten-navy/10 pt-3">
+            <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-banten-navy/45">
+              Keterangan R0–R5
+            </p>
+            <RiskLegend compact />
           </div>
         </div>
         <div class="rounded-xl border border-banten-navy/10 bg-white/80 p-4 lg:col-span-1">
@@ -216,12 +263,10 @@ onMounted(load)
               class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-banten-navy/10 px-3 py-3 text-sm hover:border-banten-gold/40"
             >
               <div>
-                <span class="rounded bg-banten-red/10 px-2 py-0.5 text-xs font-semibold text-banten-red">
-                  {{ issue.risk_level }}
-                </span>
+                <RiskBadge :level="issue.risk_level" show-label />
                 <span class="ml-2 font-medium text-banten-navy">{{ issue.title }}</span>
               </div>
-              <span class="text-xs text-banten-navy/50">{{ issue.status }}</span>
+              <IssueStatusBadge :status="issue.status" />
             </RouterLink>
           </li>
         </ul>
