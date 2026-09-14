@@ -9,6 +9,7 @@ from app.extensions import db
 from app.models import AuditLog, Issue, OpdValidation, User
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
+from app.utils.project_scope import filter_query_by_issue_ids, request_project_id
 
 bp = Blueprint("validations", __name__)
 
@@ -36,6 +37,7 @@ def list_validations():
     status = request.args.get("status")
     q = (request.args.get("q") or "").strip()
     query = OpdValidation.query
+    query = filter_query_by_issue_ids(query, OpdValidation.issue_id, request_project_id())
 
     # OPD admin only sees validations for their OPD (or assigned to them)
     if user and user.role and user.role.code == "opd_admin":

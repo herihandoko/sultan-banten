@@ -174,7 +174,7 @@ onMounted(load)
 
     <template v-else-if="data">
       <!-- Executive brief -->
-      <section class="mb-6 rounded-xl border border-banten-gold/40 bg-gradient-to-br from-white to-amber-50/60 p-5">
+      <section class="exec-brief mb-6 rounded-xl border border-banten-gold/40 bg-gradient-to-br from-white to-amber-50/60 p-5">
         <p class="text-xs font-semibold tracking-wide text-banten-gold uppercase">Executive Brief</p>
         <h2 class="mt-2 font-display text-2xl text-banten-navy">
           {{ data.executive_brief.headline }}

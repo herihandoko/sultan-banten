@@ -84,15 +84,152 @@ def _opd_by_name(name: str) -> Opd | None:
 
 
 def ensure_schema() -> None:
-    """Add missing columns on existing SQLite DBs (create_all won't alter)."""
+    """Add missing columns on existing DBs (create_all won't alter)."""
     from sqlalchemy import inspect, text
 
     insp = inspect(db.engine)
-    if "users" in insp.get_table_names():
-        cols = {c["name"] for c in insp.get_columns("users")}
-        with db.engine.begin() as conn:
+    tables = set(insp.get_table_names())
+    with db.engine.begin() as conn:
+        if "users" in tables:
+            cols = {c["name"] for c in insp.get_columns("users")}
             if "opd_id" not in cols:
                 conn.execute(text("ALTER TABLE users ADD COLUMN opd_id INTEGER"))
+        if "issues" in tables:
+            cols = {c["name"] for c in insp.get_columns("issues")}
+            if "project_id" not in cols:
+                conn.execute(text("ALTER TABLE issues ADD COLUMN project_id VARCHAR(100)"))
+            # Index — ignore if already exists
+            try:
+                conn.execute(
+                    text("CREATE INDEX IF NOT EXISTS ix_issues_project_id ON issues (project_id)")
+                )
+            except Exception:
+                pass
+
+
+def _sipantau_project_rows() -> list[tuple[str, str, str]]:
+    """(id, name, keyword) from shared sipantau_keywords table if present."""
+    from sqlalchemy import text
+
+    try:
+        rows = db.session.execute(
+            text(
+                """
+                SELECT id, COALESCE(name, ''), COALESCE(keyword, '')
+                FROM sipantau_keywords
+                WHERE COALESCE(active, TRUE) = TRUE
+                ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+                """
+            )
+        ).fetchall()
+        return [(str(r[0]), str(r[1] or ""), str(r[2] or "")) for r in rows]
+    except Exception:
+        db.session.rollback()
+        return []
+
+
+def _infer_project_id(title: str, summary: str, projects: list[tuple[str, str, str]]) -> str | None:
+    blob = f"{title or ''} {summary or ''}".lower()
+    if not projects:
+        return None
+
+    def find_by_substr(*needles: str) -> str | None:
+        for pid, name, keyword in projects:
+            hay = f"{name} {keyword}".lower()
+            if any(n in hay for n in needles):
+                return pid
+        return None
+
+    # Specific buckets first (avoid matching generic "Banten")
+    if any(w in blob for w in ("rsud", "kesehatan", "bpjs", "igd", "dinkes", "rumah sakit")):
+        hit = find_by_substr("kesehatan", "dinkes", "bpjs")
+        if hit:
+            return hit
+    if any(w in blob for w in ("andra soni", "andra", "gubernur")):
+        hit = find_by_substr("andra")
+        if hit:
+            return hit
+    if any(w in blob for w in ("diskominfo", "kominfo", "portal data")):
+        hit = find_by_substr("kominfo", "diskominfo")
+        if hit:
+            return hit
+
+    # Prefer longest keyword/name containment (more specific wins)
+    scored: list[tuple[int, str]] = []
+    for pid, name, keyword in projects:
+        for needle in (keyword, name):
+            n = (needle or "").strip().lower()
+            if len(n) >= 8 and n in blob:
+                scored.append((len(n), pid))
+    if scored:
+        scored.sort(reverse=True)
+        return scored[0][1]
+
+    return projects[-1][0] if projects else None
+
+
+def backfill_issue_project_ids() -> None:
+    """Assign SIPANTAU project_id to issues that still lack one (or re-score seed demos)."""
+    projects = _sipantau_project_rows()
+    if not projects:
+        return
+    changed = 0
+    for issue in Issue.query.all():
+        assessment = issue.risk_assessment if isinstance(issue.risk_assessment, dict) else {}
+        sip_id = assessment.get("sipantau_keyword_id")
+        # Trust explicit SIPANTAU linkage from webhook
+        if sip_id:
+            if issue.project_id != str(sip_id):
+                issue.project_id = str(sip_id)
+                changed += 1
+            continue
+        # Re-score seed/manual rows without SIPANTAU id (fix weak "Banten" matches)
+        if issue.project_id and not str(issue.mb_alert_id or "").startswith("SEED-"):
+            continue
+        pid = _infer_project_id(issue.title or "", issue.summary or "", projects)
+        if pid and issue.project_id != pid:
+            issue.project_id = pid
+            changed += 1
+        elif not issue.project_id and pid:
+            issue.project_id = pid
+            changed += 1
+    if changed:
+        db.session.commit()
+
+
+def cleanup_sipantau_issue_titles() -> None:
+    """Strip legacy 'SIPANTAU: sentimen negatif — …' titles; prefer mention text as title."""
+    import re
+
+    prefix_re = re.compile(
+        r"^\s*SIPANTAU:\s*(?:sentimen\s+negatif\s*[—\-–:]\s*)?",
+        re.IGNORECASE,
+    )
+    changed = 0
+    for issue in Issue.query.filter(Issue.source == "sipantau").all():
+        title = (issue.title or "").strip()
+        if not title.lower().startswith("sipantau:"):
+            continue
+        cleaned = prefix_re.sub("", title).strip()
+        summary = (issue.summary or "").strip()
+        # If cleaned title is only the keyword (short / matches assessment.keyword), use summary
+        assessment = issue.risk_assessment if isinstance(issue.risk_assessment, dict) else {}
+        keyword = str(assessment.get("keyword") or "").strip()
+        if summary and (not cleaned or cleaned.lower() == keyword.lower() or len(cleaned) < 24):
+            new_title = summary
+        else:
+            new_title = cleaned or summary or title
+        new_title = re.sub(r"\s+", " ", new_title).strip()
+        if len(new_title) > 140:
+            new_title = new_title[:137].rstrip() + "…"
+        if new_title and new_title != issue.title:
+            issue.title = new_title
+            narrative = issue.narrative_card if isinstance(issue.narrative_card, dict) else {}
+            if narrative:
+                issue.narrative_card = {**narrative, "headline": new_title}
+            changed += 1
+    if changed:
+        db.session.commit()
 
 
 def seed_roles() -> None:
@@ -1141,6 +1278,8 @@ def seed_all() -> None:
     seed_media_ops()
     seed_missions()
     seed_kol_campaigns()
+    backfill_issue_project_ids()
+    cleanup_sipantau_issue_titles()
 
 
 if __name__ == "__main__":

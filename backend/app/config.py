@@ -51,9 +51,14 @@ class Config:
         if o.strip()
     ]
 
-    # Mata Bathin integration
+    # Mata Bathin / SIPANTAU integration
     MATA_BATHIN_BASE_URL = os.getenv("MATA_BATHIN_BASE_URL", "")
     MATA_BATHIN_API_KEY = os.getenv("MATA_BATHIN_API_KEY", "")
     MATA_BATHIN_ENABLED = os.getenv("MATA_BATHIN_ENABLED", "false").lower() == "true"
     MATA_BATHIN_TIMEOUT = int(os.getenv("MATA_BATHIN_TIMEOUT", "10"))
     MATA_BATHIN_MAX_RETRIES = int(os.getenv("MATA_BATHIN_MAX_RETRIES", "3"))
+
+    # SIPANTAU listening engine (source of mention KPIs)
+    SIPANTAU_INTERNAL_URL = os.getenv("SIPANTAU_INTERNAL_URL", "http://panten:3000")
+    SIPANTAU_INTERNAL_KEY = os.getenv("SIPANTAU_INTERNAL_KEY", "")
+    SIPANTAU_TIMEOUT = int(os.getenv("SIPANTAU_TIMEOUT", "8"))

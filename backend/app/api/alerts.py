@@ -10,6 +10,7 @@ from app.models import CrisisAlert
 from app.services.alerts import create_crisis_alert, scan_overdue_responses
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
+from app.utils.project_scope import filter_query_by_issue_ids, request_project_id
 
 bp = Blueprint("alerts", __name__)
 
@@ -20,11 +21,14 @@ bp = Blueprint("alerts", __name__)
 def list_alerts():
     unread_only = request.args.get("unread") == "1"
     query = CrisisAlert.query
+    query = filter_query_by_issue_ids(query, CrisisAlert.issue_id, request_project_id())
     if unread_only:
         query = query.filter_by(is_read=False)
     query = query.order_by(CrisisAlert.created_at.desc())
     result = paginate(query, lambda a: a.to_dict(), default_per_page=20)
-    result["unread_count"] = CrisisAlert.query.filter_by(is_read=False).count()
+    unread_q = CrisisAlert.query.filter_by(is_read=False)
+    unread_q = filter_query_by_issue_ids(unread_q, CrisisAlert.issue_id, request_project_id())
+    result["unread_count"] = unread_q.count()
     return jsonify(result)
 
 

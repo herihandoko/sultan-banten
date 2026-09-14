@@ -68,10 +68,13 @@ def export_report(report_code: str):
 
     user_id = user.id if user else None
     issue_id = request.args.get("issue_id", type=int)
+    project_id = (request.args.get("project_id") or request.args.get("keyword_id") or "").strip() or None
 
     try:
         if report_code == "crisis":
-            content, mime, filename = report_svc.export_crisis(fmt, issue_id, user_id)
+            content, mime, filename = report_svc.export_crisis(
+                fmt, issue_id, user_id, project_id=project_id
+            )
         elif report_code == "media_sla":
             content, mime, filename = report_svc.export_media_sla(fmt, user_id)
         elif report_code == "asn":
@@ -79,7 +82,9 @@ def export_report(report_code: str):
         elif report_code == "kol":
             content, mime, filename = report_svc.export_kol(fmt, user_id)
         elif report_code == "executive":
-            content, mime, filename = report_svc.export_executive(fmt, user_id)
+            content, mime, filename = report_svc.export_executive(
+                fmt, user_id, project_id=project_id
+            )
         else:
             return jsonify({"error": "Jenis laporan tidak dikenal"}), 404
     except Exception as exc:  # noqa: BLE001 — surface export errors cleanly

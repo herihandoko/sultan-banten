@@ -7,6 +7,7 @@ from app.extensions import db
 from app.models import AuditLog, Issue, IssueEvidence
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
+from app.utils.project_scope import filter_issues_query, request_project_id
 
 bp = Blueprint("issues", __name__)
 
@@ -22,6 +23,7 @@ def list_issues():
     q = (request.args.get("q") or "").strip()
     user = get_current_user()
     query = Issue.query
+    query = filter_issues_query(query, request_project_id())
 
     if user and user.role and user.role.code == "opd_admin":
         from app.models import OpdValidation
@@ -88,6 +90,7 @@ def create_issue():
         return jsonify({"error": "Judul isu wajib diisi"}), 400
 
     user = get_current_user()
+    project_id = (data.get("project_id") or request.args.get("project_id") or "").strip() or None
     issue = Issue(
         title=title,
         summary=data.get("summary"),
@@ -98,6 +101,7 @@ def create_issue():
         narrative_card=data.get("narrative_card"),
         status="open",
         source="manual",
+        project_id=project_id,
         created_by=user.id if user else None,
         mb_alert_id=data.get("mb_alert_id"),
     )

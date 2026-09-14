@@ -106,8 +106,11 @@ def _save_report(report_type: str, title: str, payload: dict, user_id: int | Non
 # ── Crisis ──────────────────────────────────────────────────────────────────
 
 
-def collect_crisis(issue_id: int | None = None) -> dict:
+def collect_crisis(issue_id: int | None = None, project_id: str | None = None) -> dict:
+    from app.utils.project_scope import filter_issues_query
+
     q = Issue.query.order_by(Issue.created_at.desc())
+    q = filter_issues_query(q, project_id)
     if issue_id:
         q = q.filter_by(id=issue_id)
     issues = q.limit(50).all()
@@ -136,8 +139,8 @@ def collect_crisis(issue_id: int | None = None) -> dict:
     return {"type": "crisis", "count": len(rows), "issues": rows}
 
 
-def export_crisis(fmt: str, issue_id: int | None, user_id: int | None):
-    data = collect_crisis(issue_id)
+def export_crisis(fmt: str, issue_id: int | None, user_id: int | None, project_id: str | None = None):
+    data = collect_crisis(issue_id, project_id=project_id)
     title = "Laporan Penanganan Krisis"
     _save_report("crisis", title, data, user_id)
     if fmt == "xlsx":
@@ -404,14 +407,25 @@ def export_kol(fmt: str, user_id: int | None):
 # ── Executive ───────────────────────────────────────────────────────────────
 
 
-def collect_executive() -> dict:
+def collect_executive(project_id: str | None = None) -> dict:
+    from app.utils.project_scope import filter_issues_query, filter_query_by_issue_ids, issue_ids_for_project
+
     open_statuses = {"open", "validating", "producing", "approved"}
-    issues = Issue.query.all()
+    issues = filter_issues_query(Issue.query, project_id).all()
     active = [i for i in issues if i.status in open_statuses]
     critical = [i for i in active if i.risk_level in {"R3", "R4", "R5"}]
-    waiting = OpdValidation.query.filter_by(status="waiting").count()
-    asn_total = MissionParticipation.query.count()
-    kol_views = db.session.query(func.coalesce(func.sum(KolCampaign.views), 0)).scalar() or 0
+    waiting_q = OpdValidation.query.filter_by(status="waiting")
+    waiting_q = filter_query_by_issue_ids(waiting_q, OpdValidation.issue_id, project_id)
+    waiting = waiting_q.count()
+    ids = issue_ids_for_project(project_id)
+    asn_q = MissionParticipation.query.join(Mission, Mission.id == MissionParticipation.mission_id)
+    if ids is not None:
+        asn_q = asn_q.filter(Mission.issue_id.in_(ids or [-1]))
+    asn_total = asn_q.count()
+    kol_q = db.session.query(func.coalesce(func.sum(KolCampaign.views), 0))
+    if ids is not None:
+        kol_q = kol_q.filter(KolCampaign.issue_id.in_(ids or [-1]))
+    kol_views = kol_q.scalar() or 0
     return {
         "type": "executive",
         "headline": f"{len(critical)} isu kritis aktif dari {len(active)} isu terbuka",
@@ -431,8 +445,8 @@ def collect_executive() -> dict:
     }
 
 
-def export_executive(fmt: str, user_id: int | None):
-    data = collect_executive()
+def export_executive(fmt: str, user_id: int | None, project_id: str | None = None):
+    data = collect_executive(project_id=project_id)
     title = "Executive Brief"
     _save_report("executive", title, data, user_id)
     k = data["kpis"]

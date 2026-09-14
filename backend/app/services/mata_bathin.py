@@ -89,11 +89,33 @@ def ingest_crisis_alert(payload: dict[str, Any]) -> tuple[Issue, bool]:
             recommended_actions=payload.get("recommended_actions"),
             narrative_card=payload.get("narrative_card"),
             status="open",
-            source="mata_bathin",
+            source=payload.get("source")
+            or ("sipantau" if str(alert_id or "").startswith("sipantau-") else "mata_bathin"),
+            project_id=(
+                payload.get("project_id")
+                or (assessment.get("sipantau_keyword_id") if isinstance(assessment, dict) else None)
+            ),
         )
         db.session.add(issue)
         db.session.flush()
         created = True
+
+    # Keep project linkage up to date on upsert
+    incoming_project = payload.get("project_id") or (
+        assessment.get("sipantau_keyword_id") if isinstance(assessment, dict) else None
+    )
+    if incoming_project:
+        issue.project_id = str(incoming_project)
+        if isinstance(issue.risk_assessment, dict):
+            issue.risk_assessment = {
+                **issue.risk_assessment,
+                "sipantau_keyword_id": str(incoming_project),
+            }
+        elif assessment:
+            issue.risk_assessment = {
+                **(assessment if isinstance(assessment, dict) else {}),
+                "sipantau_keyword_id": str(incoming_project),
+            }
 
     evidence_url = payload.get("evidence_pack_url")
     if evidence_url and not any(e.url == evidence_url for e in issue.evidence):

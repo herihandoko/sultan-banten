@@ -17,6 +17,7 @@ from app.models import (
 from app.services.messaging import deliver_to_partner
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
+from app.utils.project_scope import filter_query_by_issue_ids, issue_ids_for_project, request_project_id
 
 bp = Blueprint("media", __name__)
 
@@ -145,6 +146,7 @@ def list_blasts():
     status = request.args.get("status")
     q = (request.args.get("q") or "").strip()
     query = MediaBlastLog.query
+    query = filter_query_by_issue_ids(query, MediaBlastLog.issue_id, request_project_id())
     if status:
         query = query.filter_by(status=status)
     if q:
@@ -172,11 +174,9 @@ def get_blast(blast_id: int):
 @role_required("super_admin", "editor", "media_kol_admin")
 def blast_ready_content():
     """Konten approved yang siap di-blast."""
-    items = (
-        ContentItem.query.filter(ContentItem.status.in_(["approved", "published"]))
-        .order_by(ContentItem.updated_at.desc())
-        .all()
-    )
+    items_q = ContentItem.query.filter(ContentItem.status.in_(["approved", "published"]))
+    items_q = filter_query_by_issue_ids(items_q, ContentItem.issue_id, request_project_id())
+    items = items_q.order_by(ContentItem.updated_at.desc()).all()
     return jsonify(
         {
             "data": [
@@ -352,7 +352,14 @@ def _sla_payload(item: MediaSlaLog) -> dict:
 @jwt_required()
 @role_required("super_admin", "editor", "media_kol_admin", "pimpinan")
 def list_sla_logs():
-    query = MediaSlaLog.query.order_by(MediaSlaLog.created_at.desc())
+    query = MediaSlaLog.query
+    project_id = request_project_id()
+    ids = issue_ids_for_project(project_id)
+    if ids is not None:
+        query = query.join(MediaBlastLog, MediaSlaLog.blast_log_id == MediaBlastLog.id).filter(
+            MediaBlastLog.issue_id.in_(ids or [-1])
+        )
+    query = query.order_by(MediaSlaLog.created_at.desc())
     result = paginate(query, _sla_payload)
     result["sla_minutes"] = SLA_MINUTES
     return jsonify(result)

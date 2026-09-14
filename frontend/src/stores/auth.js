@@ -56,19 +56,22 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function logout() {
-    try {
-      if (token.value) {
-        await axios.post(
-          '/api/auth/logout',
-          {},
-          { headers: { Authorization: `Bearer ${token.value}` } },
-        )
-      }
-    } catch {
-      // ignore network errors on logout
-    }
+    const current = token.value
+    // Clear local session immediately — never block UI/redirect on network
     setToken('')
     user.value = null
+    if (!current) return
+    // Fire-and-forget audit logout (ignore failures / hangs)
+    axios
+      .post(
+        '/api/auth/logout',
+        {},
+        {
+          headers: { Authorization: `Bearer ${current}` },
+          timeout: 3000,
+        },
+      )
+      .catch(() => {})
   }
 
   return {

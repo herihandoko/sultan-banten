@@ -1,32 +1,44 @@
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { APP_NAME, APP_FULL_NAME, APP_VERSION_LABEL } from '../config/app'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const username = ref('')
 const password = ref('')
 
+function safeNextPath() {
+  const raw = typeof route.query.next === 'string' ? route.query.next : ''
+  if (raw.startsWith('/') && !raw.startsWith('//')) return raw
+  return '/'
+}
+
 async function onSubmit() {
   const ok = await auth.login(username.value, password.value)
   if (ok) {
-    router.push('/')
+    const next = safeNextPath()
+    if (next.startsWith('/sipantau') || next.startsWith('/panten')) {
+      window.location.assign(next)
+      return
+    }
+    router.push(next)
   }
 }
 </script>
 
 <template>
-  <div class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pb-16 pt-8">
+  <div class="login-page relative flex min-h-screen flex-col items-center justify-center overflow-hidden px-4 pb-16 pt-8">
     <div
       class="pointer-events-none absolute inset-0 bg-cover bg-center bg-no-repeat"
       style="background-image: url('/siagapim_login.png')"
       aria-hidden="true"
     />
     <div
-      class="pointer-events-none absolute inset-0 bg-gradient-to-b from-white/55 via-white/25 to-banten-navy/35"
+      class="login-photo-overlay pointer-events-none absolute inset-0 bg-gradient-to-b from-white/55 via-white/25 to-banten-navy/35"
       aria-hidden="true"
     />
 
@@ -37,14 +49,14 @@ async function onSubmit() {
           :alt="APP_NAME"
           class="mx-auto h-auto w-24 select-none drop-shadow-sm"
         />
-        <h1 class="mt-4 font-display text-2xl tracking-wide text-banten-navy drop-shadow-sm">
+        <h1 class="login-brand-title mt-4 font-display text-2xl tracking-wide text-banten-navy drop-shadow-sm">
           {{ APP_NAME }}
         </h1>
-        <p class="mt-1 text-sm font-medium text-banten-navy/85">{{ APP_FULL_NAME }}</p>
+        <p class="login-brand-sub mt-1 text-sm font-medium text-banten-navy/85">{{ APP_FULL_NAME }}</p>
       </div>
 
       <form
-        class="rounded-xl border border-banten-navy/10 bg-white/95 p-6 shadow-lg backdrop-blur-sm"
+        class="login-card rounded-xl border border-banten-navy/10 bg-white/95 p-6 shadow-lg backdrop-blur-sm"
         @submit.prevent="onSubmit"
       >
         <label class="block text-sm font-medium text-banten-navy">Username</label>

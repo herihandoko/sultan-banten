@@ -17,6 +17,7 @@ from app.models import (
     OpdValidation,
 )
 from app.utils.auth import role_required
+from app.utils.project_scope import filter_issues_query, filter_query_by_issue_ids, issue_ids_for_project, request_project_id
 
 bp = Blueprint("executive", __name__)
 
@@ -27,9 +28,12 @@ bp = Blueprint("executive", __name__)
 def executive_dashboard():
     now = datetime.now(timezone.utc)
     week_ago = now - timedelta(days=7)
+    project_id = request_project_id()
+    ids = issue_ids_for_project(project_id)
 
     # Issues / crisis
-    issues = Issue.query.all()
+    issues_q = filter_issues_query(Issue.query, project_id)
+    issues = issues_q.all()
     open_statuses = {"open", "validating", "producing", "approved"}
     active_issues = [i for i in issues if i.status in open_statuses]
     risk_counts = {}
@@ -48,39 +52,54 @@ def executive_dashboard():
     ]
 
     # Validations waiting
-    waiting_validations = OpdValidation.query.filter_by(status="waiting").count()
+    val_q = OpdValidation.query.filter_by(status="waiting")
+    val_q = filter_query_by_issue_ids(val_q, OpdValidation.issue_id, project_id)
+    waiting_validations = val_q.count()
 
     # Content pipeline
-    content_by_status = dict(
-        db.session.query(ContentItem.status, func.count(ContentItem.id))
-        .group_by(ContentItem.status)
-        .all()
-    )
+    content_q = db.session.query(ContentItem.status, func.count(ContentItem.id))
+    if ids is not None:
+        content_q = content_q.filter(ContentItem.issue_id.in_(ids or [-1]))
+    content_by_status = dict(content_q.group_by(ContentItem.status).all())
 
     # Media blast (7 days)
-    recent_blasts = MediaBlastLog.query.filter(MediaBlastLog.sent_at >= week_ago).all()
+    blast_q = MediaBlastLog.query.filter(MediaBlastLog.sent_at >= week_ago)
+    blast_q = filter_query_by_issue_ids(blast_q, MediaBlastLog.issue_id, project_id)
+    recent_blasts = blast_q.all()
     blast_sent = sum((b.result or {}).get("sent", 0) for b in recent_blasts)
     blast_failed = sum((b.result or {}).get("failed", 0) for b in recent_blasts)
 
     # ASN participation
-    asn_total = MissionParticipation.query.count()
+    asn_q = db.session.query(
+        MissionParticipation.opd_name,
+        func.count(MissionParticipation.id),
+    ).join(Mission, Mission.id == MissionParticipation.mission_id)
+    if ids is not None:
+        asn_q = asn_q.filter(Mission.issue_id.in_(ids or [-1]))
     asn_by_opd = [
         {"opd_name": r[0] or "Tanpa OPD", "total": r[1]}
         for r in (
-            db.session.query(
-                MissionParticipation.opd_name,
-                func.count(MissionParticipation.id),
-            )
-            .group_by(MissionParticipation.opd_name)
+            asn_q.group_by(MissionParticipation.opd_name)
             .order_by(func.count(MissionParticipation.id).desc())
             .limit(8)
             .all()
         )
     ]
-    active_missions = Mission.query.filter_by(status="active").count()
+    asn_total_q = MissionParticipation.query.join(
+        Mission, Mission.id == MissionParticipation.mission_id
+    )
+    if ids is not None:
+        asn_total_q = asn_total_q.filter(Mission.issue_id.in_(ids or [-1]))
+    asn_total = asn_total_q.count()
+
+    mission_q = Mission.query.filter_by(status="active")
+    mission_q = filter_query_by_issue_ids(mission_q, Mission.issue_id, project_id)
+    active_missions = mission_q.count()
 
     # KOL
-    kol_campaigns = KolCampaign.query.all()
+    kol_q = KolCampaign.query
+    kol_q = filter_query_by_issue_ids(kol_q, KolCampaign.issue_id, project_id)
+    kol_campaigns = kol_q.all()
     kol_by_status = {}
     kol_views = 0
     for c in kol_campaigns:
@@ -114,6 +133,7 @@ def executive_dashboard():
         {
             "data": {
                 "generated_at": now.isoformat(),
+                "project_id": project_id,
                 "kpis": {
                     "active_issues": len(active_issues),
                     "critical_issues": len(

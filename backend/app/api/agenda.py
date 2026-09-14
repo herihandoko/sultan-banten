@@ -6,9 +6,10 @@ from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 
 from app.extensions import db
-from app.models import AuditLog, EditorialAgenda
+from app.models import AuditLog, ContentItem, EditorialAgenda
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
+from app.utils.project_scope import issue_ids_for_project, request_project_id
 
 bp = Blueprint("agenda", __name__)
 
@@ -41,8 +42,15 @@ def list_agenda():
     month = request.args.get("month")  # YYYY-MM
 
     query = EditorialAgenda.query
+    project_id = request_project_id()
+    ids = issue_ids_for_project(project_id)
+    if ids is not None:
+        # Agenda linked via content → issue; unlinked rows hidden when project scoped
+        query = query.outerjoin(ContentItem, EditorialAgenda.content_id == ContentItem.id).filter(
+            ContentItem.issue_id.in_(ids or [-1])
+        )
     if status:
-        query = query.filter_by(status=status)
+        query = query.filter(EditorialAgenda.status == status)
     if theme:
         query = query.filter_by(theme=theme)
     if channel:

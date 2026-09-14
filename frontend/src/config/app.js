@@ -6,3 +6,8 @@ export const APP_TAGLINE =
   'Media monitoring isu aktual yang menyangkut pimpinan — pantau setiap hari'
 export const APP_VERSION = '0.2.0'
 export const APP_VERSION_LABEL = `v${APP_VERSION}`
+
+/** Sibling listening app on same origin (nginx /sipantau/) */
+export const SIPANTAU_URL = import.meta.env.VITE_SIPANTAU_URL || '/sipantau/'
+/** @deprecated use SIPANTAU_URL */
+export const PANTEN_URL = SIPANTAU_URL

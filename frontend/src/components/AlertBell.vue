@@ -3,8 +3,10 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../services/api'
 import RiskBadge from './RiskBadge.vue'
+import { useProjectStore } from '../stores/project'
 
 const router = useRouter()
+const projectStore = useProjectStore()
 const open = ref(false)
 const alerts = ref([])
 const unreadCount = ref(0)
@@ -108,6 +110,14 @@ watch(open, (v) => {
   if (v) loadAlerts()
 })
 
+watch(
+  () => projectStore.selectedId,
+  () => {
+    seenIds.clear()
+    loadAlerts()
+  },
+)
+
 const badge = computed(() => (unreadCount.value > 9 ? '9+' : String(unreadCount.value)))
 </script>
 
@@ -115,7 +125,7 @@ const badge = computed(() => (unreadCount.value > 9 ? '9+' : String(unreadCount.
   <div class="relative" data-alert-bell>
     <button
       type="button"
-      class="relative rounded-md border border-banten-navy/15 bg-white px-2.5 py-1.5 text-banten-navy transition hover:border-banten-gold"
+      class="relative rounded-lg border border-[#30363d] bg-[#161b22] px-2.5 py-1.5 text-[#c9d1d9] transition hover:border-emerald-500/40 hover:text-white"
       title="Alert Krisis"
       @click.stop="open = !open"
     >
@@ -135,18 +145,18 @@ const badge = computed(() => (unreadCount.value > 9 ? '9+' : String(unreadCount.
 
     <div
       v-if="open"
-      class="absolute right-0 z-40 mt-2 w-80 overflow-hidden rounded-xl border border-banten-navy/10 bg-white shadow-lg sm:w-96"
+      class="absolute right-0 z-40 mt-2 w-80 overflow-hidden rounded-xl border border-[#30363d] bg-[#161b22] text-[#c9d1d9] shadow-2xl sm:w-96"
       @click.stop
     >
-      <div class="flex items-center justify-between border-b border-banten-navy/10 px-4 py-3">
+      <div class="flex items-center justify-between border-b border-[#30363d] px-4 py-3">
         <div>
-          <p class="text-sm font-semibold text-banten-navy">Alert Krisis</p>
-          <p class="text-[11px] text-banten-navy/50">F.02 · Web + WA + Telegram</p>
+          <p class="text-sm font-semibold text-white">Alert Krisis</p>
+          <p class="text-[11px] text-[#8b949e]">F.02 · Web + WA + Telegram</p>
         </div>
         <button
           v-if="unreadCount"
           type="button"
-          class="text-[11px] text-banten-gold hover:underline"
+          class="text-[11px] text-emerald-400 hover:underline"
           @click="markAll"
         >
           Tandai semua dibaca
@@ -155,7 +165,7 @@ const badge = computed(() => (unreadCount.value > 9 ? '9+' : String(unreadCount.
 
       <div
         v-if="permission === 'default'"
-        class="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900"
+        class="border-b border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs text-amber-200"
       >
         <button type="button" class="font-semibold underline" @click="enableWebPush">
           Aktifkan Web Notification
@@ -163,18 +173,18 @@ const badge = computed(() => (unreadCount.value > 9 ? '9+' : String(unreadCount.
       </div>
 
       <div class="max-h-80 overflow-y-auto">
-        <p v-if="loading && !alerts.length" class="px-4 py-6 text-center text-xs text-banten-navy/50">
+        <p v-if="loading && !alerts.length" class="px-4 py-6 text-center text-xs text-[#8b949e]">
           Memuat...
         </p>
-        <p v-else-if="!alerts.length" class="px-4 py-6 text-center text-xs text-banten-navy/50">
+        <p v-else-if="!alerts.length" class="px-4 py-6 text-center text-xs text-[#8b949e]">
           Tidak ada alert.
         </p>
         <button
           v-for="a in alerts"
           :key="a.id"
           type="button"
-          class="block w-full border-b border-banten-navy/5 px-4 py-3 text-left transition hover:bg-banten-sand/40"
-          :class="!a.is_read ? 'bg-amber-50/40' : ''"
+          class="block w-full border-b border-[#30363d]/60 px-4 py-3 text-left transition hover:bg-[#21262d]"
+          :class="!a.is_read ? 'bg-emerald-500/5' : ''"
           @click="markRead(a)"
         >
           <div class="flex items-center gap-2">
@@ -189,9 +199,9 @@ const badge = computed(() => (unreadCount.value > 9 ? '9+' : String(unreadCount.
             </span>
             <span v-if="!a.is_read" class="h-1.5 w-1.5 rounded-full bg-banten-red" />
           </div>
-          <p class="mt-1 text-sm font-medium text-banten-navy line-clamp-1">{{ a.title }}</p>
-          <p class="mt-0.5 text-xs text-banten-navy/65 line-clamp-2">{{ a.message }}</p>
-          <p class="mt-1 text-[10px] text-banten-navy/40">
+          <p class="mt-1 text-sm font-medium text-white line-clamp-1">{{ a.title }}</p>
+          <p class="mt-0.5 text-xs text-[#8b949e] line-clamp-2">{{ a.message }}</p>
+          <p class="mt-1 text-[10px] text-[#6e7681]">
             {{ a.alert_type }} · {{ a.created_at }}
           </p>
         </button>

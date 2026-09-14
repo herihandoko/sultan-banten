@@ -109,10 +109,12 @@ router.beforeEach(async (to) => {
   if (!auth.ready) {
     await auth.bootstrap()
   }
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+  const needsAuth = to.matched.some((r) => r.meta.requiresAuth)
+  const isGuest = to.matched.some((r) => r.meta.guest)
+  if (needsAuth && !auth.isAuthenticated) {
     return { name: 'login' }
   }
-  if (to.meta.guest && auth.isAuthenticated) {
+  if (isGuest && auth.isAuthenticated) {
     return defaultHome(auth.user?.role?.code)
   }
   if (

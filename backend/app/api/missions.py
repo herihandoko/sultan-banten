@@ -10,6 +10,7 @@ from app.extensions import db
 from app.models import AuditLog, Issue, Mission, MissionParticipation, User
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
+from app.utils.project_scope import filter_issues_query, filter_query_by_issue_ids, issue_ids_for_project, request_project_id
 
 bp = Blueprint("missions", __name__)
 
@@ -38,6 +39,7 @@ def list_missions():
     q = (request.args.get("q") or "").strip()
     action_type = request.args.get("action_type")
     query = Mission.query
+    query = filter_query_by_issue_ids(query, Mission.issue_id, request_project_id())
     if status != "all":
         query = query.filter_by(status=status)
     if action_type:
@@ -61,12 +63,16 @@ def list_missions():
 @role_required("super_admin", "editor", "pimpinan", "media_kol_admin")
 def participation_stats():
     """Rekap partisipasi ASN per OPD (F.11)."""
+    project_id = request_project_id()
+    ids = issue_ids_for_project(project_id)
+    q = db.session.query(
+        MissionParticipation.opd_name,
+        func.count(MissionParticipation.id).label("total"),
+    ).join(Mission, Mission.id == MissionParticipation.mission_id)
+    if ids is not None:
+        q = q.filter(Mission.issue_id.in_(ids or [-1]))
     rows = (
-        db.session.query(
-            MissionParticipation.opd_name,
-            func.count(MissionParticipation.id).label("total"),
-        )
-        .group_by(MissionParticipation.opd_name)
+        q.group_by(MissionParticipation.opd_name)
         .order_by(func.count(MissionParticipation.id).desc())
         .all()
     )
@@ -84,7 +90,9 @@ def participation_stats():
 @jwt_required()
 @role_required("super_admin", "editor", "media_kol_admin")
 def issue_options():
-    issues = Issue.query.order_by(Issue.created_at.desc()).limit(50).all()
+    issues_q = Issue.query
+    issues_q = filter_issues_query(issues_q, request_project_id())
+    issues = issues_q.order_by(Issue.created_at.desc()).limit(50).all()
     return jsonify(
         {
             "data": [

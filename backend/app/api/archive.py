@@ -9,6 +9,7 @@ from sqlalchemy import or_
 from app.models import ContentItem, Issue, MediaBlastLog, OpdValidation
 from app.utils.auth import role_required
 from app.utils.pagination import paginate, pagination_args
+from app.utils.project_scope import filter_issues_query, filter_query_by_issue_ids, request_project_id
 
 bp = Blueprint("archive", __name__)
 
@@ -142,6 +143,7 @@ def search_archive():
 
     if archive_type in {"all", "issues"}:
         query = Issue.query
+        query = filter_issues_query(query, request_project_id())
         if q:
             like = f"%{q}%"
             query = query.filter(
@@ -175,6 +177,7 @@ def search_archive():
 
     if archive_type in {"all", "content"}:
         cquery = ContentItem.query
+        cquery = filter_query_by_issue_ids(cquery, ContentItem.issue_id, request_project_id())
         if q:
             like = f"%{q}%"
             cquery = cquery.filter(

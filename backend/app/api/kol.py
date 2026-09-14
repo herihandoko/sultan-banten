@@ -10,6 +10,7 @@ from app.extensions import db
 from app.models import AuditLog, Issue, KolCampaign, KolPartner
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
+from app.utils.project_scope import filter_query_by_issue_ids, request_project_id
 
 bp = Blueprint("kol", __name__)
 
@@ -175,6 +176,7 @@ def list_campaigns():
     budget_status = request.args.get("budget_status")
     q = (request.args.get("q") or "").strip()
     query = KolCampaign.query
+    query = filter_query_by_issue_ids(query, KolCampaign.issue_id, request_project_id())
     if status:
         query = query.filter_by(status=status)
     if budget_status:

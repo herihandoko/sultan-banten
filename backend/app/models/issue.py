@@ -18,7 +18,9 @@ class Issue(db.Model):
     recommended_actions = db.Column(db.JSON)
     status = db.Column(db.String(50), default="open", nullable=False, index=True)
     # open | validating | producing | approved | disseminated | closed
-    source = db.Column(db.String(50), default="mata_bathin")  # mata_bathin | manual
+    source = db.Column(db.String(50), default="mata_bathin")  # sipantau | mata_bathin | manual
+    # SIPANTAU keyword/project id (e.g. proj-andra-soni) — scopes Crisis Room data
+    project_id = db.Column(db.String(100), index=True)
     narrative_card = db.Column(db.JSON)
     assigned_to = db.Column(db.Integer, db.ForeignKey("users.id"))
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
@@ -48,6 +50,7 @@ class Issue(db.Model):
             "recommended_actions": self.recommended_actions,
             "status": self.status,
             "source": self.source,
+            "project_id": self.project_id,
             "narrative_card": self.narrative_card,
             "assigned_to": self.assigned_to,
             "created_by": self.created_by,

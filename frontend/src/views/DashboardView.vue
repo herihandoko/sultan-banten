@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import { Line } from 'vue-chartjs'
 import {
@@ -13,9 +13,11 @@ import {
   Tooltip,
 } from 'chart.js'
 import api from '../services/api'
+import { useProjectStore } from '../stores/project'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
+const projectStore = useProjectStore()
 const data = ref(null)
 const loading = ref(true)
 const error = ref('')
@@ -31,7 +33,9 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const res = await api.get('/dashboard')
+    const params = {}
+    if (projectStore.selectedId) params.project_id = projectStore.selectedId
+    const res = await api.get('/dashboard', { params })
     data.value = res.data.data
   } catch (err) {
     error.value = err.response?.data?.error || 'Gagal memuat dashboard'
@@ -119,6 +123,13 @@ function formatReach(n) {
   return formatMention(n)
 }
 
+watch(
+  () => projectStore.selectedId,
+  () => {
+    load()
+  },
+)
+
 onMounted(load)
 </script>
 
@@ -129,11 +140,26 @@ onMounted(load)
         <h1 class="font-display text-3xl text-banten-navy">Dashboard SIAGAPIM BANTEN</h1>
         <p class="mt-1 text-sm text-banten-navy/65">
           Media monitoring isu aktual yang menyangkut pimpinan — pantauan harian
+          <span v-if="projectStore.selectedProject" class="font-medium text-banten-navy">
+            · {{ projectStore.selectedProject.name }}
+          </span>
         </p>
       </div>
       <div class="flex items-center gap-2">
         <span
-          v-if="data?.source === 'mata_bathin_stub'"
+          v-if="data?.source === 'sipantau_stub'"
+          class="rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200/80"
+        >
+          SIPANTAU offline · KPI fallback
+        </span>
+        <span
+          v-else-if="data?.source === 'sipantau'"
+          class="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800 ring-1 ring-emerald-200/80"
+        >
+          Live · SIPANTAU
+        </span>
+        <span
+          v-else-if="data?.source === 'mata_bathin_stub'"
           class="rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200/80"
         >
           Data demo · stub Mata Bathin
@@ -183,8 +209,8 @@ onMounted(load)
       </section>
 
       <!-- Trend + Alerts -->
-      <section class="mb-5 grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-        <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-banten-navy/5">
+      <section class="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,22rem)]">
+        <div class="min-w-0 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-banten-navy/5">
           <h2 class="text-base font-semibold text-slate-800">
             Tren volume &amp; sentimen mention (7 hari)
           </h2>
@@ -193,32 +219,37 @@ onMounted(load)
           </div>
         </div>
 
-        <div class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-banten-navy/5">
-          <div class="flex items-center justify-between gap-2">
+        <div class="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-banten-navy/5">
+          <div class="flex shrink-0 items-center justify-between gap-2">
             <h2 class="text-base font-semibold text-slate-800">Alert isu aktif</h2>
-            <RouterLink to="/crisis-room" class="text-xs text-banten-gold hover:underline">
+            <RouterLink to="/crisis-room" class="shrink-0 text-xs text-banten-gold hover:underline">
               Crisis Room →
             </RouterLink>
           </div>
-          <ul class="mt-4 space-y-3">
-            <li v-for="(alert, idx) in data.alerts" :key="alert.id || idx">
+          <ul class="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
+            <li v-for="(alert, idx) in data.alerts" :key="alert.id || idx" class="min-w-0">
               <component
                 :is="alert.id ? RouterLink : 'div'"
                 :to="alert.id ? `/issues/${alert.id}` : undefined"
-                class="flex gap-3 rounded-xl bg-slate-50/80 px-3 py-3 transition"
+                class="flex min-w-0 gap-3 rounded-xl bg-slate-50/80 px-3 py-3 transition"
                 :class="alert.id ? 'hover:bg-slate-100' : ''"
               >
                 <span
                   class="mt-0.5 w-1 shrink-0 self-stretch rounded-full"
                   :class="severityBar[alert.severity] || 'bg-slate-300'"
                 />
-                <div class="min-w-0">
-                  <p class="truncate font-medium text-slate-800">{{ alert.title }}</p>
-                  <p class="mt-0.5 text-xs text-slate-500">
+                <div class="min-w-0 flex-1 overflow-hidden">
+                  <p class="line-clamp-2 text-sm font-medium leading-snug text-slate-800">
+                    {{ alert.title }}
+                  </p>
+                  <p class="mt-1 text-xs text-slate-500">
                     Severity {{ alert.severity }} · {{ alert.ago }}
                   </p>
                 </div>
               </component>
+            </li>
+            <li v-if="!(data.alerts || []).length" class="text-sm text-slate-500">
+              Tidak ada isu aktif untuk project ini.
             </li>
           </ul>
         </div>

@@ -7,6 +7,7 @@ from app.extensions import db
 from app.models import AuditLog, ContentApproval, ContentItem, Issue
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
+from app.utils.project_scope import filter_issues_query, filter_query_by_issue_ids, request_project_id
 
 bp = Blueprint("content", __name__)
 
@@ -37,6 +38,7 @@ def list_content():
     content_type = request.args.get("content_type")
     q = (request.args.get("q") or "").strip()
     query = ContentItem.query
+    query = filter_query_by_issue_ids(query, ContentItem.issue_id, request_project_id())
     if status:
         query = query.filter_by(status=status)
     if issue_id:
@@ -60,11 +62,9 @@ def list_content():
 @role_required("super_admin", "editor")
 def issues_ready_for_content():
     """Isu yang siap / sedang produksi konten."""
-    issues = (
-        Issue.query.filter(Issue.status.in_(["validating", "producing", "approved", "open"]))
-        .order_by(Issue.updated_at.desc())
-        .all()
-    )
+    issues_q = Issue.query.filter(Issue.status.in_(["validating", "producing", "approved", "open"]))
+    issues_q = filter_issues_query(issues_q, request_project_id())
+    issues = issues_q.order_by(Issue.updated_at.desc()).all()
     return jsonify(
         {
             "data": [

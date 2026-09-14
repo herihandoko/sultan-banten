@@ -1,12 +1,14 @@
-"""Intel overview dashboard — ringkasan situasi publik (Mata Bathin style)."""
+"""Intel overview dashboard — KPIs from SIPANTAU + active Crisis Room issues."""
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
-from flask import Blueprint, jsonify
+import requests
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import jwt_required
 
 from app.models import Issue
 from app.utils.auth import role_required
+from app.utils.project_scope import filter_issues_query, request_project_id
 
 bp = Blueprint("dashboard", __name__)
 
@@ -39,16 +41,135 @@ def _severity_from_risk(level: str) -> str:
     return "rendah"
 
 
+def _sipantau_headers() -> dict[str, str]:
+    headers = {"Accept": "application/json"}
+    internal_key = current_app.config.get("SIPANTAU_INTERNAL_KEY") or ""
+    if internal_key:
+        headers["X-Internal-Key"] = internal_key
+    auth = request.headers.get("Authorization")
+    if auth:
+        headers["Authorization"] = auth
+    return headers
+
+
+def _sipantau_base() -> str:
+    return (current_app.config.get("SIPANTAU_INTERNAL_URL") or "").rstrip("/")
+
+
+def _fetch_sipantau_dashboard(keyword_id: str | None = None) -> dict | None:
+    base = _sipantau_base()
+    if not base:
+        return None
+    params = {}
+    if keyword_id:
+        params["keyword_id"] = keyword_id
+    try:
+        res = requests.get(
+            f"{base}/api/export/dashboard",
+            headers=_sipantau_headers(),
+            params=params,
+            timeout=current_app.config.get("SIPANTAU_TIMEOUT", 8),
+        )
+        if not res.ok:
+            current_app.logger.warning("SIPANTAU dashboard export HTTP %s", res.status_code)
+            return None
+        body = res.json()
+        return body.get("data") if isinstance(body, dict) else None
+    except requests.RequestException as exc:
+        current_app.logger.warning("SIPANTAU dashboard export failed: %s", exc)
+        return None
+
+
+def _fetch_sipantau_projects() -> list[dict] | None:
+    base = _sipantau_base()
+    if not base:
+        return None
+    try:
+        res = requests.get(
+            f"{base}/api/keywords",
+            headers=_sipantau_headers(),
+            timeout=current_app.config.get("SIPANTAU_TIMEOUT", 8),
+        )
+        if not res.ok:
+            current_app.logger.warning("SIPANTAU keywords HTTP %s", res.status_code)
+            return None
+        body = res.json()
+        rows = body.get("data") if isinstance(body, dict) else None
+        if not isinstance(rows, list):
+            return None
+        projects = []
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            pid = row.get("id")
+            if not pid:
+                continue
+            projects.append(
+                {
+                    "id": str(pid),
+                    "name": row.get("name") or row.get("keyword") or str(pid),
+                    "keyword": row.get("keyword") or "",
+                    "avatar_emoji": row.get("avatarEmoji") or row.get("avatar_emoji") or "📡",
+                    "total_mentions": row.get("totalMentions") or row.get("total_mentions") or 0,
+                }
+            )
+        return projects
+    except requests.RequestException as exc:
+        current_app.logger.warning("SIPANTAU keywords failed: %s", exc)
+        return None
+
+
+def _stub_metrics() -> dict:
+    return {
+        "source": "sipantau_stub",
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "kpis": {
+            "total_mention": 0,
+            "sentiment_negative_pct": 0,
+            "reach": 0,
+            "active_issues": 0,
+        },
+        "trend_7d": {
+            "labels": ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"],
+            "positif": [0, 0, 0, 0, 0, 0, 0],
+            "negatif": [0, 0, 0, 0, 0, 0, 0],
+        },
+        "platforms": [
+            {"key": "twitter", "label": "X/Twitter", "count": 0},
+            {"key": "news", "label": "Portal berita", "count": 0},
+            {"key": "instagram", "label": "Instagram", "count": 0},
+        ],
+    }
+
+
+@bp.get("/projects")
+@jwt_required()
+@role_required("super_admin", "editor", "pimpinan", "media_kol_admin", "opd_admin")
+def list_projects():
+    """Daftar project SIPANTAU (keyword) untuk filter topbar SIAGAPIM."""
+    projects = _fetch_sipantau_projects()
+    if projects is None:
+        return jsonify({"data": [], "source": "unavailable"}), 200
+    return jsonify({"data": projects, "source": "sipantau"})
+
+
 @bp.get("")
 @jwt_required()
 @role_required("super_admin", "editor", "pimpinan", "media_kol_admin", "opd_admin")
 def intel_dashboard():
     """
     Ringkasan intelijen untuk beranda.
-    Metrik mention/sentimen/reach: stub demo (nanti diganti Mata Bathin API).
+    Metrik mention/sentimen/reach: dari SIPANTAU (fallback stub jika down).
     Alert isu aktif: dari database Crisis Room.
+    Query: project_id / keyword_id — filter KPI + isu terkait project SIPANTAU.
     """
-    issues = Issue.query.order_by(Issue.created_at.desc()).all()
+    project_id = (request.args.get("project_id") or request.args.get("keyword_id") or "").strip() or None
+
+    projects = _fetch_sipantau_projects() or []
+    project_meta = next((p for p in projects if p["id"] == project_id), None) if project_id else None
+
+    issues_q = filter_issues_query(Issue.query.order_by(Issue.created_at.desc()), project_id)
+    issues = issues_q.all()
     active = [i for i in issues if i.status in OPEN_STATUSES]
 
     alerts = []
@@ -64,68 +185,26 @@ def intel_dashboard():
             }
         )
 
-    # Demo fallback if no active issues — mirror lampiran
-    if not alerts:
-        alerts = [
-            {
-                "id": None,
-                "title": "Isu jembatan rusak",
-                "severity": "tinggi",
-                "risk_level": "R4",
-                "status": "open",
-                "ago": "12 menit lalu",
-            },
-            {
-                "id": None,
-                "title": "Keluhan layanan RSUD",
-                "severity": "sedang",
-                "risk_level": "R2",
-                "status": "open",
-                "ago": "40 menit lalu",
-            },
-            {
-                "id": None,
-                "title": "Hoaks bansos palsu",
-                "severity": "sedang",
-                "risk_level": "R3",
-                "status": "validating",
-                "ago": "1 jam lalu",
-            },
-        ]
-
-    # Deterministic demo series (Sen–Min) — replace with Mata Bathin later
-    trend = {
-        "labels": ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"],
-        "positif": [42, 48, 45, 58, 55, 62, 60],
-        "negatif": [38, 35, 40, 32, 36, 28, 30],
-    }
-
-    platforms = [
-        {"key": "twitter", "label": "X/Twitter", "count": 1920},
-        {"key": "news", "label": "Portal berita", "count": 840},
-        {"key": "instagram", "label": "Instagram", "count": 1150},
-        {"key": "whatsapp", "label": "Grup WA", "count": 902},
-    ]
-
-    total_mention = sum(p["count"] for p in platforms)
-    # Scale to look like lampiran (~4812) while staying consistent with platform sum
-    if total_mention < 4000:
-        total_mention = 4812
+    sip = _fetch_sipantau_dashboard(project_id) or _stub_metrics()
+    kpis = dict(sip.get("kpis") or {})
+    kpis["active_issues"] = len(active)
 
     return jsonify(
         {
             "data": {
-                "source": "mata_bathin_stub",
-                "updated_at": datetime.now(timezone.utc).isoformat(),
-                "kpis": {
-                    "total_mention": total_mention,
-                    "sentiment_negative_pct": 31,
-                    "reach": 2_100_000,
-                    "active_issues": len(active) if active else 7,
+                "source": sip.get("source") or "sipantau",
+                "updated_at": sip.get("updated_at") or datetime.now(timezone.utc).isoformat(),
+                "project_id": project_id,
+                "project": project_meta,
+                "kpis": kpis,
+                "trend_7d": sip.get("trend_7d")
+                or {
+                    "labels": ["Sen", "Sel", "Rab", "Kam", "Jum", "Sab", "Min"],
+                    "positif": [0, 0, 0, 0, 0, 0, 0],
+                    "negatif": [0, 0, 0, 0, 0, 0, 0],
                 },
-                "trend_7d": trend,
                 "alerts": alerts,
-                "platforms": platforms,
+                "platforms": sip.get("platforms") or [],
             }
         }
     )
