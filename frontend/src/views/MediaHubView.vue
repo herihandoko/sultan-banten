@@ -46,6 +46,13 @@ const blastForm = ref({
 const blasting = ref(false)
 const blastResult = ref(null)
 const selectAll = ref(true)
+const messagingStatus = ref(null)
+const testEmailForm = ref({ to: '', subject: '[SIAGAPIM] Test email', body: '' })
+const testWaForm = ref({ to: '', message: '' })
+const testingEmail = ref(false)
+const testingWa = ref(false)
+const testEmailResult = ref(null)
+const testWaResult = ref(null)
 const filters = ref({
   q: '',
   active: '',
@@ -88,9 +95,10 @@ async function load() {
       api.get('/media/blasts', { params: blastParams }),
       api.get('/media/sla', { params: { page: slaPage.value, per_page: 10 } }),
       api.get('/media/sla/ranking'),
+      api.get('/media/messaging-status'),
     ]
     if (canManage.value) reqs.push(api.get('/media/blast-ready-content'))
-    const [pRes, pAllRes, bRes, slaRes, rankRes, cRes] = await Promise.all(reqs)
+    const [pRes, pAllRes, bRes, slaRes, rankRes, msgRes, cRes] = await Promise.all(reqs)
     partners.value = pRes.data.data || []
     partnersMeta.value = pRes.data.meta || null
     partnersAll.value = pAllRes.data.data || []
@@ -100,6 +108,7 @@ async function load() {
     slaMeta.value = slaRes.data.meta || null
     slaMinutes.value = slaRes.data.sla_minutes || 60
     slaRanking.value = rankRes.data.data || []
+    messagingStatus.value = msgRes.data.data || null
     if (cRes) {
       readyContent.value = cRes.data.data || []
       if (!blastForm.value.content_id && readyContent.value.length) {
@@ -224,6 +233,47 @@ async function runBlast() {
     formError.value = err.response?.data?.error || 'Gagal mengirim blast'
   } finally {
     blasting.value = false
+  }
+}
+
+async function runTestEmail() {
+  testingEmail.value = true
+  testEmailResult.value = null
+  formError.value = ''
+  try {
+    const payload = {
+      to: testEmailForm.value.to.trim(),
+      subject: testEmailForm.value.subject || undefined,
+    }
+    if (testEmailForm.value.body.trim()) payload.body = testEmailForm.value.body.trim()
+    const { data } = await api.post('/media/test-email', payload)
+    testEmailResult.value = data.data
+  } catch (err) {
+    testEmailResult.value = err.response?.data?.data || {
+      status: 'failed',
+      error: err.response?.data?.error || 'Gagal kirim test email',
+    }
+  } finally {
+    testingEmail.value = false
+  }
+}
+
+async function runTestWhatsapp() {
+  testingWa.value = true
+  testWaResult.value = null
+  formError.value = ''
+  try {
+    const payload = { to: testWaForm.value.to.trim() }
+    if (testWaForm.value.message.trim()) payload.message = testWaForm.value.message.trim()
+    const { data } = await api.post('/media/test-whatsapp', payload)
+    testWaResult.value = data.data
+  } catch (err) {
+    testWaResult.value = err.response?.data?.data || {
+      status: 'failed',
+      error: err.response?.data?.error || 'Gagal kirim test WhatsApp',
+    }
+  } finally {
+    testingWa.value = false
   }
 }
 
@@ -451,10 +501,25 @@ onMounted(load)
         <div v-if="!canManage" class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-12 text-center text-sm text-banten-navy/60">
           Hanya editor / admin media yang dapat mengirim blast.
         </div>
-        <form v-else class="rounded-xl border border-banten-navy/10 bg-white/90 p-5" @submit.prevent="runBlast">
+        <div v-else class="space-y-5">
+          <div
+            v-if="messagingStatus"
+            class="rounded-xl border border-banten-navy/10 bg-white/90 px-4 py-3 text-xs text-banten-navy/75"
+          >
+            Gateway:
+            <span :class="messagingStatus.whatsapp?.enabled ? 'text-emerald-700' : 'text-amber-700'">
+              WA Fonnte {{ messagingStatus.whatsapp?.enabled ? 'aktif' : 'belum token' }}
+            </span>
+            ·
+            <span :class="messagingStatus.mail?.enabled ? 'text-emerald-700' : 'text-amber-700'">
+              Email SMTP {{ messagingStatus.mail?.enabled ? `aktif (${messagingStatus.mail.host}:${messagingStatus.mail.port})` : 'nonaktif (MAIL_ENABLED)' }}
+            </span>
+          </div>
+
+          <form class="rounded-xl border border-banten-navy/10 bg-white/90 p-5" @submit.prevent="runBlast">
           <h2 class="font-display text-lg text-banten-navy">One-Click Media Blast</h2>
           <p class="mt-1 text-xs text-banten-navy/60">
-            Kirim konten approved ke media mitra via WA Gateway + Email (demo mock).
+            Kirim konten approved ke media mitra via WhatsApp (Fonnte) + Email (SMTP).
           </p>
 
           <label class="mt-4 block text-sm font-medium text-banten-navy">Konten approved</label>
@@ -521,7 +586,89 @@ onMounted(load)
             Blast #{{ blastResult.id }} · {{ blastResult.status }} ·
             terkirim {{ blastResult.result?.sent || 0 }}, gagal {{ blastResult.result?.failed || 0 }}
           </div>
-        </form>
+          </form>
+
+          <div class="grid gap-5 md:grid-cols-2">
+            <form class="rounded-xl border border-banten-navy/10 bg-white/90 p-5" @submit.prevent="runTestEmail">
+              <h3 class="font-display text-base text-banten-navy">Uji kirim email</h3>
+              <p class="mt-1 text-xs text-banten-navy/60">Kirim satu email uji lewat SMTP Media Hub.</p>
+              <label class="mt-3 block text-xs font-medium text-banten-navy/70">Ke</label>
+              <input
+                v-model="testEmailForm.to"
+                type="email"
+                required
+                placeholder="nama@domain.go.id"
+                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+              />
+              <label class="mt-3 block text-xs font-medium text-banten-navy/70">Subjek</label>
+              <input
+                v-model="testEmailForm.subject"
+                type="text"
+                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+              />
+              <button
+                type="submit"
+                class="mt-4 rounded-md border border-banten-navy/20 bg-banten-sand/60 px-4 py-2 text-sm font-medium text-banten-navy disabled:opacity-60"
+                :disabled="testingEmail || !testEmailForm.to"
+              >
+                {{ testingEmail ? 'Mengirim...' : 'Kirim test email' }}
+              </button>
+              <p
+                v-if="testEmailResult"
+                class="mt-3 text-xs"
+                :class="testEmailResult.status === 'sent' ? 'text-emerald-700' : 'text-banten-red'"
+              >
+                {{ testEmailResult.status }}
+                <template v-if="testEmailResult.error"> — {{ testEmailResult.error }}</template>
+                <template v-else-if="testEmailResult.preview"> — {{ testEmailResult.preview }}</template>
+              </p>
+            </form>
+
+            <form class="rounded-xl border border-banten-navy/10 bg-white/90 p-5" @submit.prevent="runTestWhatsapp">
+              <h3 class="font-display text-base text-banten-navy">Uji kirim WhatsApp</h3>
+              <p class="mt-1 text-xs text-banten-navy/60">
+                Via
+                <a
+                  href="https://docs.fonnte.com/api-send-message/"
+                  target="_blank"
+                  rel="noopener"
+                  class="text-banten-gold underline"
+                >Fonnte</a>
+              </p>
+              <label class="mt-3 block text-xs font-medium text-banten-navy/70">Nomor</label>
+              <input
+                v-model="testWaForm.to"
+                type="text"
+                required
+                placeholder="0812… atau 62812…"
+                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+              />
+              <label class="mt-3 block text-xs font-medium text-banten-navy/70">Pesan (opsional)</label>
+              <textarea
+                v-model="testWaForm.message"
+                rows="2"
+                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+                placeholder="Kosongkan untuk pesan uji default"
+              />
+              <button
+                type="submit"
+                class="mt-4 rounded-md border border-banten-navy/20 bg-banten-sand/60 px-4 py-2 text-sm font-medium text-banten-navy disabled:opacity-60"
+                :disabled="testingWa || !testWaForm.to"
+              >
+                {{ testingWa ? 'Mengirim...' : 'Kirim test WA' }}
+              </button>
+              <p
+                v-if="testWaResult"
+                class="mt-3 text-xs"
+                :class="testWaResult.status === 'sent' ? 'text-emerald-700' : 'text-banten-red'"
+              >
+                {{ testWaResult.status }}
+                <template v-if="testWaResult.error"> — {{ testWaResult.error }}</template>
+                <template v-else-if="testWaResult.message_id"> — id {{ testWaResult.message_id }}</template>
+              </p>
+            </form>
+          </div>
+        </div>
       </div>
 
       <!-- SLA -->

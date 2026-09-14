@@ -30,6 +30,7 @@ import urllib.request
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
+PANTEN_ROOT = ROOT.parent / "Panten"
 ENV_FILE = Path(__file__).resolve().parent / ".env.deploy"
 
 DEFAULTS = {
@@ -37,9 +38,12 @@ DEFAULTS = {
     "DEPLOY_USER": "python",
     "DEPLOY_PORT": "22",
     "DEPLOY_REMOTE_DIR": "/home/python/apps/sultan-banten",
+    # Sibling folder so docker-compose context ../Panten resolves on the VM
+    "DEPLOY_PANTEN_REMOTE_DIR": "/home/python/apps/Panten",
     "DEPLOY_COMPOSE_FILE": "docker-compose.standalone.yml",
     "DEPLOY_ENV_FILE": ".env.standalone",
     "DEPLOY_HEALTH_URL": "https://siagapim.bantenprov.go.id/api/health",
+    "DEPLOY_SIPANTAU_HEALTH_URL": "https://siagapim.bantenprov.go.id/sipantau/",
     "DEPLOY_USE_SUDO": "1",
 }
 
@@ -52,6 +56,7 @@ RSYNC_EXCLUDES = [
     "frontend/node_modules",
     "backend/.venv",
     "backend/instance",
+    "dist",
     "__pycache__",
     "*.pyc",
     ".DS_Store",
@@ -179,6 +184,30 @@ def sync_files(password: str, remote_dir: str) -> None:
     ]
     run(cmd, env={**os.environ, "SSHPASS": password})
 
+    # SIPANTAU (Panten) is built from sibling path ../Panten in compose
+    panten_remote = cfg("DEPLOY_PANTEN_REMOTE_DIR").strip()
+    if panten_remote and PANTEN_ROOT.is_dir():
+        print(f"\n  + sync SIPANTAU → {panten_remote}")
+        run(
+            ssh_base(host, user, port) + [f"mkdir -p {shlex.quote(panten_remote)}"],
+            env={**os.environ, "SSHPASS": password},
+        )
+        run(
+            [
+                "rsync",
+                "-az",
+                "--delete",
+                "-e",
+                rsync_ssh(port),
+                *excludes,
+                f"{PANTEN_ROOT}/",
+                f"{user}@{host}:{panten_remote}/",
+            ],
+            env={**os.environ, "SSHPASS": password},
+        )
+    elif panten_remote and not PANTEN_ROOT.is_dir():
+        print(f"WARN: lokal {PANTEN_ROOT} tidak ada — skip sync SIPANTAU")
+
 
 def remote_rebuild(password: str, remote_dir: str) -> None:
     host = cfg("DEPLOY_HOST")
@@ -219,7 +248,7 @@ def health_check(url: str, retries: int = 12, delay: float = 5.0) -> None:
                 body = resp.read().decode("utf-8", errors="replace")
                 print(f"  [{i}/{retries}] HTTP {resp.status}: {body[:200]}")
                 if resp.status == 200:
-                    print("OK — deploy selesai.")
+                    print("OK — endpoint sehat.")
                     return
         except (urllib.error.URLError, TimeoutError) as err:
             last_err = err
@@ -247,11 +276,14 @@ def main() -> None:
     host = cfg("DEPLOY_HOST")
     user = cfg("DEPLOY_USER")
     health_url = cfg("DEPLOY_HEALTH_URL")
+    sipantau_health = cfg("DEPLOY_SIPANTAU_HEALTH_URL")
 
     if args.health_only:
         if not health_url:
             die("DEPLOY_HEALTH_URL kosong")
         health_check(health_url)
+        if sipantau_health:
+            health_check(sipantau_health, retries=6, delay=3.0)
         return
 
     if not password:
@@ -263,9 +295,10 @@ def main() -> None:
 
     remote_dir = resolve_remote_dir(password)
 
-    print("=== SIAGAPIM deploy ===")
+    print("=== SIAGAPIM + SIPANTAU deploy ===")
     print(f"Host     : {user}@{host}:{cfg('DEPLOY_PORT')}")
     print(f"Remote   : {remote_dir}")
+    print(f"Panten   : {cfg('DEPLOY_PANTEN_REMOTE_DIR')} (local={PANTEN_ROOT})")
     print(f"Compose  : {cfg('DEPLOY_COMPOSE_FILE')} + {cfg('DEPLOY_ENV_FILE')}")
     print(f"Health   : {health_url or '(skip)'}")
 
@@ -285,6 +318,9 @@ def main() -> None:
     if health_url:
         print("\n[3/3] Verifikasi...")
         health_check(health_url)
+        if sipantau_health:
+            health_check(sipantau_health, retries=8, delay=4.0)
+        print("OK — deploy selesai.")
     else:
         print("\n[3/3] Health URL kosong — skip verifikasi.")
         print("OK — deploy selesai.")

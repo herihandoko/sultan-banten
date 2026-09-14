@@ -24,11 +24,19 @@ def _mock_telegram(chat: str, text: str) -> dict:
 
 
 def dispatch_channels(title: str, message: str) -> dict:
-    """Mock outbound notifications for demo."""
+    """Outbound notifications: web queue + WhatsApp (Fonnte) + telegram mock."""
+    import os
+
     body = f"{title}\n\n{message}"
+    wa_to = (os.getenv("CRISIS_WA_NUMBER") or "").strip()
+    wa_result = (
+        send_whatsapp(wa_to, body)
+        if wa_to
+        else {"channel": "whatsapp", "status": "skipped", "error": "CRISIS_WA_NUMBER kosong"}
+    )
     return {
         "web": {"channel": "web", "status": "queued"},
-        "whatsapp": send_whatsapp("6281200009999", body),  # demo desk number
+        "whatsapp": wa_result,
         "telegram": _mock_telegram("@sultan_banten_crisis", body),
     }
 

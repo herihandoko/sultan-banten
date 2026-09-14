@@ -62,3 +62,23 @@ class Config:
     SIPANTAU_INTERNAL_URL = os.getenv("SIPANTAU_INTERNAL_URL", "http://panten:3000")
     SIPANTAU_INTERNAL_KEY = os.getenv("SIPANTAU_INTERNAL_KEY", "")
     SIPANTAU_TIMEOUT = int(os.getenv("SIPANTAU_TIMEOUT", "8"))
+
+    # Email SMTP (Media Hub blast)
+    MAIL_ENABLED = os.getenv("MAIL_ENABLED", "false").lower() == "true"
+    MAIL_MAILER = os.getenv("MAIL_MAILER", "smtp")
+    MAIL_HOST = os.getenv("MAIL_HOST", "")
+    MAIL_PORT = int(os.getenv("MAIL_PORT", "587") or 587)
+    MAIL_USERNAME = os.getenv("MAIL_USERNAME", "")
+    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "")
+    MAIL_ENCRYPTION = os.getenv("MAIL_ENCRYPTION", "tls")
+    MAIL_FROM_ADDRESS = os.getenv("MAIL_FROM_ADDRESS", "")
+    MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "SIAGAPIM Banten")
+    MAIL_MOCK = os.getenv("MAIL_MOCK", "false").lower() == "true"
+
+    # WhatsApp via Fonnte (https://docs.fonnte.com/api-send-message/)
+    FONNTE_TOKEN = os.getenv("FONNTE_TOKEN", "")
+    FONNTE_COUNTRY_CODE = os.getenv("FONNTE_COUNTRY_CODE", "62")
+    FONNTE_DELAY = os.getenv("FONNTE_DELAY", "2")
+    FONNTE_TIMEOUT = os.getenv("FONNTE_TIMEOUT", "20")
+    FONNTE_MOCK = os.getenv("FONNTE_MOCK", "false").lower() == "true"
+    CRISIS_WA_NUMBER = os.getenv("CRISIS_WA_NUMBER", "")

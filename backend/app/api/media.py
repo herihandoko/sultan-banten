@@ -14,7 +14,12 @@ from app.models import (
     MediaPartner,
     MediaSlaLog,
 )
-from app.services.messaging import deliver_to_partner
+from app.services.messaging import (
+    deliver_to_partner,
+    messaging_status,
+    send_email,
+    send_whatsapp,
+)
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
 from app.utils.project_scope import filter_query_by_issue_ids, issue_ids_for_project, request_project_id
@@ -22,6 +27,75 @@ from app.utils.project_scope import filter_query_by_issue_ids, issue_ids_for_pro
 bp = Blueprint("media", __name__)
 
 SLA_MINUTES = 60  # PRD: SLA 1 jam
+
+
+@bp.get("/messaging-status")
+@jwt_required()
+@role_required("super_admin", "editor", "media_kol_admin", "pimpinan")
+def get_messaging_status():
+    """Status gateway WA/email (tanpa secret) untuk UI Media Hub."""
+    return jsonify({"data": messaging_status()})
+
+
+@bp.post("/test-email")
+@jwt_required()
+@role_required("super_admin", "editor", "media_kol_admin")
+def test_email():
+    """Uji kirim email SMTP (satu penerima)."""
+    data = request.get_json(silent=True) or {}
+    to = (data.get("to") or "").strip()
+    if not to:
+        return jsonify({"error": "to (alamat email) wajib"}), 400
+    subject = (data.get("subject") or "[SIAGAPIM] Test email").strip()
+    body = (
+        data.get("body")
+        or "Ini adalah email uji dari SIAGAPIM Media Hub.\n\nJika Anda menerima pesan ini, konfigurasi SMTP sudah benar."
+    )
+    result = send_email(to, subject, body)
+    user = get_current_user()
+    db.session.add(
+        AuditLog(
+            user_id=user.id if user else None,
+            action="test_email",
+            entity_type="messaging",
+            entity_id=None,
+            details={"to": to, "status": result.get("status"), "error": result.get("error")},
+            ip_address=request.remote_addr,
+        )
+    )
+    db.session.commit()
+    code = 200 if result.get("status") == "sent" else 502
+    return jsonify({"data": result}), code
+
+
+@bp.post("/test-whatsapp")
+@jwt_required()
+@role_required("super_admin", "editor", "media_kol_admin")
+def test_whatsapp():
+    """Uji kirim WhatsApp via Fonnte (satu nomor)."""
+    data = request.get_json(silent=True) or {}
+    to = (data.get("to") or "").strip()
+    if not to:
+        return jsonify({"error": "to (nomor WhatsApp) wajib"}), 400
+    message = (
+        data.get("message")
+        or "Ini adalah pesan uji dari SIAGAPIM Media Hub via Fonnte."
+    )
+    result = send_whatsapp(to, message)
+    user = get_current_user()
+    db.session.add(
+        AuditLog(
+            user_id=user.id if user else None,
+            action="test_whatsapp",
+            entity_type="messaging",
+            entity_id=None,
+            details={"to": to, "status": result.get("status"), "error": result.get("error")},
+            ip_address=request.remote_addr,
+        )
+    )
+    db.session.commit()
+    code = 200 if result.get("status") == "sent" else 502
+    return jsonify({"data": result}), code
 
 
 # ── F.06 Database Media Mitra ───────────────────────────────────────────────
@@ -202,7 +276,7 @@ def blast_ready_content():
 def one_click_blast():
     """
     One-click media blast: kirim konten ke semua (atau subset) media mitra aktif
-    via WhatsApp / Email (mock gateway untuk demo).
+    via WhatsApp (Fonnte) / Email (SMTP).
     """
     data = request.get_json(silent=True) or {}
     content_id = data.get("content_id")
