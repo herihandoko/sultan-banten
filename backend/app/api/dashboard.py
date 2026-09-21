@@ -9,6 +9,7 @@ from flask_jwt_extended import jwt_required
 from app.models import Issue
 from app.utils.auth import role_required
 from app.utils.project_scope import filter_issues_query, request_project_id
+from app.extensions import db
 
 bp = Blueprint("dashboard", __name__)
 
@@ -169,8 +170,31 @@ def intel_dashboard():
     project_meta = next((p for p in projects if p["id"] == project_id), None) if project_id else None
 
     issues_q = filter_issues_query(Issue.query.order_by(Issue.created_at.desc()), project_id)
+    # Align with Crisis Room: hide seed/demo issues from "isu aktif"
+    issues_q = issues_q.filter(
+        db.or_(
+            Issue.mb_alert_id.is_(None),
+            ~Issue.mb_alert_id.ilike("SEED-%"),
+        )
+    )
     issues = issues_q.all()
     active = [i for i in issues if i.status in OPEN_STATUSES]
+
+    # Pull fresh SIPANTAU negatives into Crisis Room when dashboard loads
+    try:
+        from app.services.sipantau_sync import sync_sipantau_crises
+
+        sync_sipantau_crises(project_id)
+        issues = filter_issues_query(Issue.query.order_by(Issue.created_at.desc()), project_id)
+        issues = issues.filter(
+            db.or_(
+                Issue.mb_alert_id.is_(None),
+                ~Issue.mb_alert_id.ilike("SEED-%"),
+            )
+        ).all()
+        active = [i for i in issues if i.status in OPEN_STATUSES]
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.warning("dashboard crisis sync skipped: %s", exc)
 
     alerts = []
     for issue in active[:6]:

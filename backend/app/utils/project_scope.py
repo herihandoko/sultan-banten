@@ -92,6 +92,10 @@ def ensure_issue_project_id_column() -> None:
                 "CREATE INDEX IF NOT EXISTS ix_issues_project_id ON issues (project_id)"
             )
         )
+        # Google News RSS URLs exceed VARCHAR(500)
+        db.session.execute(
+            text("ALTER TABLE issue_evidence ALTER COLUMN url TYPE TEXT")
+        )
         db.session.commit()
     except Exception:
         db.session.rollback()

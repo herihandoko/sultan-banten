@@ -1,15 +1,26 @@
 """Crisis Room issue endpoints."""
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import jwt_required
 
 from app.extensions import db
 from app.models import AuditLog, Issue, IssueEvidence
+from app.services.sipantau_sync import sync_sipantau_crises
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
 from app.utils.project_scope import filter_issues_query, request_project_id
 
 bp = Blueprint("issues", __name__)
+
+
+def _exclude_seed_demos(query):
+    """Hide seed/demo issues so Crisis Room mirrors live SIPANTAU listening."""
+    return query.filter(
+        db.or_(
+            Issue.mb_alert_id.is_(None),
+            ~Issue.mb_alert_id.ilike("SEED-%"),
+        )
+    )
 
 
 # Allow OPD to list issues they are validating (via validation assignment)
@@ -21,9 +32,21 @@ def list_issues():
     risk_level = request.args.get("risk_level")
     source = request.args.get("source")
     q = (request.args.get("q") or "").strip()
+    include_demo = (request.args.get("include_demo") or "0").lower() in {"1", "true", "yes"}
+    do_sync = (request.args.get("sync") or "1").lower() not in {"0", "false", "no"}
+    project_id = request_project_id()
+    sync_meta = None
+
+    if do_sync:
+        try:
+            sync_meta = sync_sipantau_crises(project_id)
+        except Exception as exc:  # noqa: BLE001 — never block Crisis Room listing
+            current_app.logger.warning("crisis sync skipped: %s", exc)
+            sync_meta = {"error": str(exc), "candidates": 0, "pushed": 0}
+
     user = get_current_user()
     query = Issue.query
-    query = filter_issues_query(query, request_project_id())
+    query = filter_issues_query(query, project_id)
 
     if user and user.role and user.role.code == "opd_admin":
         from app.models import OpdValidation
@@ -38,6 +61,9 @@ def list_issues():
             ).all()
         ]
         query = query.filter(Issue.id.in_(issue_ids or [-1]))
+
+    if not include_demo:
+        query = _exclude_seed_demos(query)
 
     if status:
         query = query.filter_by(status=status)
@@ -55,7 +81,11 @@ def list_issues():
             )
         )
     query = query.order_by(Issue.created_at.desc())
-    return jsonify(paginate(query, lambda i: i.to_dict()))
+    payload = paginate(query, lambda i: i.to_dict())
+    if sync_meta is not None:
+        payload["sipantau_sync"] = sync_meta
+    payload["include_demo"] = include_demo
+    return jsonify(payload)
 
 
 @bp.get("/<int:issue_id>")

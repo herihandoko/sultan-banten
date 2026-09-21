@@ -22,6 +22,14 @@ def create_app(config_class: type[Config] = Config) -> Flask:
 
     register_blueprints(app)
 
+    with app.app_context():
+        try:
+            from app.utils.project_scope import ensure_issue_project_id_column
+
+            ensure_issue_project_id_column()
+        except Exception:
+            pass
+
     @app.get("/api/health")
     def health():
         return {

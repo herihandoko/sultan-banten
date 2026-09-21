@@ -8,6 +8,8 @@ from typing import Any
 import requests
 from flask import current_app
 
+from flask import current_app
+
 from app.extensions import db
 from app.models import Issue, IssueEvidence
 
@@ -118,22 +120,30 @@ def ingest_crisis_alert(payload: dict[str, Any]) -> tuple[Issue, bool]:
             }
 
     evidence_url = payload.get("evidence_pack_url")
-    if evidence_url and not any(e.url == evidence_url for e in issue.evidence):
-        db.session.add(
-            IssueEvidence(
-                issue_id=issue.id,
-                title="Evidence Pack Mata Bathin",
-                url=evidence_url,
-                source_name="Mata Bathin",
-                evidence_type="other",
+    if evidence_url:
+        evidence_url = str(evidence_url).strip()
+        # Google News RSS links can exceed VARCHAR(500)
+        if len(evidence_url) > 2000:
+            evidence_url = evidence_url[:2000]
+        if evidence_url and not any(e.url == evidence_url for e in (issue.evidence or [])):
+            db.session.add(
+                IssueEvidence(
+                    issue_id=issue.id,
+                    title="Evidence Pack SIPANTAU",
+                    url=evidence_url,
+                    source_name=payload.get("source") or "SIPANTAU",
+                    evidence_type="other",
+                )
             )
-        )
 
     from app.services.alerts import maybe_alert_on_issue
 
-    # Fire F.02 alert for R3+ (new or risk elevated)
-    if created or risk in {"R3", "R4", "R5"}:
-        maybe_alert_on_issue(issue, force=created)
+    # Fire F.02 alert for R3+ (new or risk elevated) — never fail the ingest
+    try:
+        if created or risk in {"R3", "R4", "R5"}:
+            maybe_alert_on_issue(issue, force=created)
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.warning("crisis alert side-effect failed: %s", exc)
 
     db.session.commit()
     return issue, created

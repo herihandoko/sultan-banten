@@ -71,7 +71,7 @@ class IssueEvidence(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     issue_id = db.Column(db.Integer, db.ForeignKey("issues.id"), nullable=False)
     title = db.Column(db.String(255))
-    url = db.Column(db.String(500))
+    url = db.Column(db.Text)
     source_name = db.Column(db.String(150))
     evidence_type = db.Column(db.String(50))  # article | social | video | other
     snippet = db.Column(db.Text)

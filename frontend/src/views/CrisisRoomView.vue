@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
+import { useProjectStore } from '../stores/project'
 import PaginationBar from '../components/PaginationBar.vue'
 import RiskBadge from '../components/RiskBadge.vue'
 import IssueStatusBadge from '../components/IssueStatusBadge.vue'
@@ -10,6 +11,7 @@ import { RISK_LEVELS, riskOptionLabel, riskTitle } from '../config/risk'
 import { ISSUE_STATUSES, issueStatusOptionLabel } from '../config/issueStatus'
 
 const auth = useAuthStore()
+const projectStore = useProjectStore()
 const issues = ref([])
 const meta = ref(null)
 const page = ref(1)
@@ -24,6 +26,8 @@ const filters = ref({
   risk_level: '',
   source: '',
 })
+const includeDemo = ref(false)
+const syncInfo = ref(null)
 const form = ref({
   title: '',
   summary: '',
@@ -40,13 +44,15 @@ async function load() {
   loading.value = true
   error.value = ''
   try {
-    const params = { page: page.value, per_page: 10 }
+    const params = { page: page.value, per_page: 10, sync: '1' }
     for (const [k, v] of Object.entries(filters.value)) {
       if (v) params[k] = v
     }
+    if (includeDemo.value) params.include_demo = '1'
     const issuesRes = await api.get('/issues', { params })
     issues.value = issuesRes.data.data || []
     meta.value = issuesRes.data.meta || null
+    syncInfo.value = issuesRes.data.sipantau_sync || null
   } catch (err) {
     error.value = err.response?.data?.error || 'Gagal memuat data Crisis Room'
   } finally {
@@ -87,6 +93,14 @@ async function createIssue() {
 }
 
 onMounted(load)
+
+watch(
+  () => projectStore.selectedId,
+  () => {
+    page.value = 1
+    load()
+  },
+)
 </script>
 
 <template>
@@ -95,7 +109,10 @@ onMounted(load)
       <div>
         <h1 class="font-display text-3xl text-banten-navy">Crisis Room</h1>
         <p class="mt-1 text-sm text-banten-navy/65">
-          Pusat komando isu — alert dari Mata Bathin dan input manual
+          Isu dari pantauan SIPANTAU (sentimen negatif) + input manual — selaras dengan Dashboard
+        </p>
+        <p v-if="syncInfo && !syncInfo.error" class="mt-1 text-[11px] text-banten-navy/50">
+          Sync SIPANTAU: {{ syncInfo.candidates || 0 }} kandidat · {{ syncInfo.pushed || 0 }} masuk Crisis Room
         </p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -148,16 +165,21 @@ onMounted(load)
           <label class="text-xs font-medium text-banten-navy/70">Sumber</label>
           <select v-model="filters.source" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
             <option value="">Semua</option>
+            <option value="sipantau">SIPANTAU</option>
             <option value="mata_bathin">Mata Bathin</option>
             <option value="manual">Manual</option>
           </select>
         </div>
       </div>
-      <div class="mt-4 flex flex-wrap gap-2">
+      <div class="mt-4 flex flex-wrap items-center gap-3">
         <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
         <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
           Reset
         </button>
+        <label class="ml-auto flex items-center gap-2 text-xs text-banten-navy/65">
+          <input v-model="includeDemo" type="checkbox" @change="applyFilters" />
+          Tampilkan data demo (seed)
+        </label>
       </div>
     </form>
 
@@ -222,9 +244,10 @@ onMounted(load)
       v-else-if="!issues.length"
       class="rounded-xl border border-dashed border-banten-navy/20 bg-white/60 px-6 py-16 text-center"
     >
-      <p class="font-display text-xl text-banten-navy">Belum ada isu aktif</p>
+      <p class="font-display text-xl text-banten-navy">Belum ada isu dari pantauan</p>
       <p class="mt-2 text-sm text-banten-navy/60">
-        Alert dari Mata Bathin akan muncul di sini, atau gunakan input manual sebagai fallback.
+        Mention negatif dari SIPANTAU akan muncul di sini otomatis, atau gunakan input manual.
+        Data demo seed disembunyikan — centang “Tampilkan data demo” bila perlu.
       </p>
     </div>
     <div v-else class="space-y-3">

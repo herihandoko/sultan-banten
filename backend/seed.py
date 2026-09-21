@@ -105,6 +105,11 @@ def ensure_schema() -> None:
                 )
             except Exception:
                 pass
+        if "issue_evidence" in tables:
+            try:
+                conn.execute(text("ALTER TABLE issue_evidence ALTER COLUMN url TYPE TEXT"))
+            except Exception:
+                pass
 
 
 def _sipantau_project_rows() -> list[tuple[str, str, str]]:
