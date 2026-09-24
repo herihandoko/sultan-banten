@@ -9,6 +9,8 @@ const props = defineProps({
   required: { type: Boolean, default: false },
   disabled: { type: Boolean, default: false },
   searchPlaceholder: { type: String, default: 'Cari...' },
+  /** light | dark — use hex colors so html.dark overrides don't wash out contrast */
+  tone: { type: String, default: 'light' },
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -17,6 +19,8 @@ const open = ref(false)
 const query = ref('')
 const root = ref(null)
 const searchInput = ref(null)
+
+const dark = computed(() => props.tone === 'dark')
 
 onClickOutside(root, () => {
   open.value = false
@@ -60,18 +64,26 @@ function clear() {
   <div ref="root" class="relative mt-1">
     <button
       type="button"
-      class="flex w-full items-center justify-between gap-2 rounded-md border border-banten-navy/20 bg-white px-3 py-2 text-left text-sm outline-none focus:border-banten-gold disabled:opacity-60"
+      class="flex w-full items-center justify-between gap-2 rounded-lg border px-3 py-2 text-left text-sm outline-none transition disabled:opacity-60"
+      :class="
+        dark
+          ? 'border-[#30363d] bg-[#0d1117] text-[#e6edf3] focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30'
+          : 'border-[#cbd5e1] bg-white text-[#1b3a5c] focus:border-[#c9a227]'
+      "
       :disabled="disabled"
       :aria-expanded="open"
       aria-haspopup="listbox"
       @click="toggle"
     >
-      <span class="truncate" :class="selected ? 'text-banten-navy' : 'text-banten-navy/45'">
+      <span
+        class="truncate"
+        :class="selected ? (dark ? 'text-[#e6edf3]' : 'text-[#1b3a5c]') : dark ? 'text-[#6e7681]' : 'text-[#64748b]'"
+      >
         {{ selected?.label || placeholder }}
       </span>
       <svg
-        class="h-4 w-4 shrink-0 text-banten-navy/45 transition"
-        :class="open ? 'rotate-180' : ''"
+        class="h-4 w-4 shrink-0 transition"
+        :class="[open ? 'rotate-180' : '', dark ? 'text-[#8b949e]' : 'text-[#94a3b8]']"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -82,7 +94,6 @@ function clear() {
       </svg>
     </button>
 
-    <!-- Native required validation for form submit -->
     <input
       class="pointer-events-none absolute inset-0 h-0 w-0 opacity-0"
       tabindex="-1"
@@ -93,15 +104,21 @@ function clear() {
 
     <div
       v-if="open"
-      class="absolute z-30 mt-1 w-full overflow-hidden rounded-md border border-banten-navy/15 bg-white shadow-lg"
+      class="absolute z-30 mt-1 w-full overflow-hidden rounded-xl border shadow-2xl"
+      :class="dark ? 'border-[#30363d] bg-[#161b22]' : 'border-[#e2e8f0] bg-white'"
       role="listbox"
     >
-      <div class="border-b border-banten-navy/10 p-2">
+      <div class="border-b p-2" :class="dark ? 'border-[#30363d]' : 'border-[#e2e8f0]'">
         <input
           ref="searchInput"
           v-model="query"
           type="search"
-          class="w-full rounded-md border border-banten-navy/20 px-3 py-1.5 text-sm outline-none focus:border-banten-gold"
+          class="w-full rounded-lg border px-3 py-1.5 text-sm outline-none"
+          :class="
+            dark
+              ? 'border-[#30363d] bg-[#0d1117] text-[#e6edf3] placeholder:text-[#6e7681] focus:border-emerald-500/50'
+              : 'border-[#cbd5e1] bg-white text-[#1b3a5c] placeholder:text-[#94a3b8] focus:border-[#c9a227]'
+          "
           :placeholder="searchPlaceholder"
           @keydown.esc.stop="open = false"
         />
@@ -110,7 +127,8 @@ function clear() {
         <li>
           <button
             type="button"
-            class="w-full px-3 py-2 text-left text-sm text-banten-navy/50 hover:bg-banten-sand/60"
+            class="w-full px-3 py-2 text-left text-sm transition"
+            :class="dark ? 'text-[#6e7681] hover:bg-[#21262d]' : 'text-[#64748b] hover:bg-[#f1f5f9]'"
             @click="clear"
           >
             {{ placeholder }}
@@ -119,11 +137,15 @@ function clear() {
         <li v-for="opt in filtered" :key="opt.value">
           <button
             type="button"
-            class="w-full px-3 py-2 text-left text-sm hover:bg-banten-sand/60"
+            class="w-full px-3 py-2 text-left text-sm transition"
             :class="
               String(opt.value) === String(modelValue)
-                ? 'bg-banten-navy/8 font-medium text-banten-navy'
-                : 'text-banten-navy/80'
+                ? dark
+                  ? 'bg-[#21262d] font-medium text-emerald-300'
+                  : 'bg-[#e8eef4] font-medium text-[#1b3a5c]'
+                : dark
+                  ? 'text-[#c9d1d9] hover:bg-[#21262d]'
+                  : 'text-[#1b3a5c] hover:bg-[#f1f5f9]'
             "
             role="option"
             :aria-selected="String(opt.value) === String(modelValue)"
@@ -132,7 +154,11 @@ function clear() {
             {{ opt.label }}
           </button>
         </li>
-        <li v-if="!filtered.length" class="px-3 py-2 text-sm text-banten-navy/45">
+        <li
+          v-if="!filtered.length"
+          class="px-3 py-2 text-sm"
+          :class="dark ? 'text-[#6e7681]' : 'text-[#94a3b8]'"
+        >
           Tidak ada hasil
         </li>
       </ul>

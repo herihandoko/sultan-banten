@@ -45,9 +45,12 @@ def list_agenda():
     project_id = request_project_id()
     ids = issue_ids_for_project(project_id)
     if ids is not None:
-        # Agenda linked via content → issue; unlinked rows hidden when project scoped
+        # Kalender editorial tanpa konten tetap tampil; yang sudah ditautkan ikut proyek.
         query = query.outerjoin(ContentItem, EditorialAgenda.content_id == ContentItem.id).filter(
-            ContentItem.issue_id.in_(ids or [-1])
+            db.or_(
+                EditorialAgenda.content_id.is_(None),
+                ContentItem.issue_id.in_(ids or [-1]),
+            )
         )
     if status:
         query = query.filter(EditorialAgenda.status == status)

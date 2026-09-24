@@ -163,6 +163,12 @@ html.dark .text-gray-900 {
   color: #e6edf3 !important;
 }
 
+html.dark .text-banten-navy\/80,
+html.dark .text-banten-navy\/85,
+html.dark .text-banten-navy\/90 {
+  color: #c9d1d9 !important;
+}
+
 html.dark .text-banten-navy\/40,
 html.dark .text-banten-navy\/45,
 html.dark .text-banten-navy\/50,
@@ -242,8 +248,17 @@ html.dark tbody tr:hover {
 }
 
 html.dark .bg-amber-50,
+html.dark .bg-amber-50\/50,
 html.dark .bg-amber-50\/60 {
   background-color: rgba(210, 153, 34, 0.12) !important;
+}
+html.dark .issue-brief,
+html.dark .issue-brief p,
+html.dark .issue-brief h2 {
+  color: #e6edf3 !important;
+}
+html.dark .issue-brief .issue-brief-title {
+  color: #e3b341 !important;
 }
 html.dark .text-amber-800,
 html.dark .text-amber-900 {

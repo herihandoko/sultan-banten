@@ -72,11 +72,53 @@ const canManage = computed(() =>
   ['super_admin', 'editor', 'media_kol_admin'].includes(auth.user?.role?.code),
 )
 
-const statusColor = {
-  sent: 'bg-emerald-100 text-emerald-800',
-  partial: 'bg-amber-100 text-amber-800',
-  failed: 'bg-red-100 text-red-800',
-  pending: 'bg-slate-200 text-slate-700',
+const activePartnerCount = computed(() => partnersAll.value.length)
+const readyCount = computed(() => readyContent.value.length)
+const blastTotal = computed(() => blastsMeta.value?.total || 0)
+const slaAverage = computed(() => {
+  const rows = slaRanking.value.filter((row) => row.compliance_rate != null)
+  if (!rows.length) return null
+  return Math.round(rows.reduce((sum, row) => sum + Number(row.compliance_rate), 0) / rows.length)
+})
+
+const BLAST_STATUS = {
+  sent: { label: 'Terkirim', chip: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
+  partial: { label: 'Sebagian', chip: 'border-amber-500/40 bg-amber-500/10 text-amber-300' },
+  failed: { label: 'Gagal', chip: 'border-rose-500/40 bg-rose-500/10 text-rose-300' },
+  pending: { label: 'Menunggu', chip: 'border-slate-500/40 bg-slate-500/10 text-slate-300' },
+}
+
+const CHANNEL_LABEL = {
+  both: 'WA + Email',
+  whatsapp: 'WhatsApp',
+  email: 'Email',
+}
+
+const inputClass =
+  'mt-1 w-full rounded-xl border border-[#30363d] bg-[#0d1117] px-3 py-2.5 text-sm text-[#e6edf3] placeholder:text-[#6e7681] outline-none transition focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30'
+
+function blastStatus(status) {
+  return BLAST_STATUS[status] || { label: status, chip: 'border-[#30363d] text-[#c9d1d9]' }
+}
+
+function formatDateTime(iso) {
+  if (!iso) return ''
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`
+  const d = new Date(normalized)
+  if (Number.isNaN(d.getTime())) return iso
+  const date = d.toLocaleDateString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+  const time = d.toLocaleTimeString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return `${date} · ${time} WIB`
 }
 
 async function load() {
@@ -320,12 +362,13 @@ onMounted(load)
   <div>
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-display text-3xl text-banten-navy">Media Hub</h1>
-        <p class="mt-1 text-sm text-banten-navy/65">
-          F.06 Mitra · F.07 SLA · F.08 Media Blast
+        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-400/80">F.06 · F.07 · F.08</p>
+        <h1 class="mt-1 font-display text-3xl text-white">Media Hub</h1>
+        <p class="mt-1 max-w-xl text-sm text-[#8b949e]">
+          Mitra media, blast klarifikasi, dan kepatuhan SLA tayang dalam satu ruang kerja.
         </p>
       </div>
-      <div class="flex gap-1 rounded-md border border-banten-navy/15 bg-white/70 p-1 text-xs">
+      <div class="flex flex-wrap gap-1 rounded-xl border border-[#30363d] bg-[#161b22] p-1 text-xs">
         <button
           v-for="t in [
             { key: 'partners', label: 'Media Mitra' },
@@ -335,8 +378,8 @@ onMounted(load)
           ]"
           :key="t.key"
           type="button"
-          class="rounded px-3 py-1.5 transition"
-          :class="tab === t.key ? 'bg-banten-navy text-white' : 'text-banten-navy/70 hover:bg-banten-sand'"
+          class="rounded-lg px-3 py-1.5 font-semibold transition"
+          :class="tab === t.key ? 'bg-emerald-500 text-black' : 'text-[#c9d1d9] hover:bg-[#21262d]'"
           @click="tab = t.key"
         >
           {{ t.label }}
@@ -344,50 +387,72 @@ onMounted(load)
       </div>
     </div>
 
+    <section class="mb-6 grid grid-cols-2 gap-2 lg:grid-cols-4">
+      <button type="button" class="rounded-xl border border-[#30363d] bg-[#161b22] px-3 py-3 text-left" @click="tab = 'partners'">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-[#6e7681]">Mitra aktif</p>
+        <p class="mt-1 text-2xl font-bold tabular-nums text-white">{{ activePartnerCount }}</p>
+      </button>
+      <button type="button" class="rounded-xl border border-[#30363d] bg-[#161b22] px-3 py-3 text-left" @click="tab = 'blast'">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-[#6e7681]">Siap di-blast</p>
+        <p class="mt-1 text-2xl font-bold tabular-nums text-emerald-300">{{ readyCount }}</p>
+      </button>
+      <button type="button" class="rounded-xl border border-[#30363d] bg-[#161b22] px-3 py-3 text-left" @click="tab = 'logs'">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-[#6e7681]">Riwayat blast</p>
+        <p class="mt-1 text-2xl font-bold tabular-nums text-white">{{ blastTotal }}</p>
+      </button>
+      <button type="button" class="rounded-xl border border-[#30363d] bg-[#161b22] px-3 py-3 text-left" @click="tab = 'sla'">
+        <p class="text-[10px] font-semibold uppercase tracking-wider text-[#6e7681]">Rata kepatuhan</p>
+        <p class="mt-1 text-2xl font-bold tabular-nums text-amber-300">{{ slaAverage == null ? '—' : `${slaAverage}%` }}</p>
+        <p class="text-[10px] text-[#6e7681]">Target tayang {{ slaMinutes }} menit</p>
+      </button>
+    </section>
+
     <form
       v-if="tab === 'partners' || tab === 'logs'"
-      class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
+      class="mb-6 rounded-2xl border border-[#30363d] bg-[#161b22] p-4"
       @submit.prevent="applyFilters"
     >
-      <div class="grid gap-3 md:grid-cols-4">
+      <div class="grid gap-3 md:grid-cols-4 md:items-end">
         <div class="md:col-span-2">
-          <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
+          <label class="text-[10px] font-bold uppercase tracking-wider text-[#6e7681]">Kata kunci</label>
           <input
             v-model="filters.q"
             type="search"
-            :placeholder="tab === 'partners' ? 'Nama media, editor, wilayah...' : 'Judul konten, kanal...'"
-            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+            :placeholder="tab === 'partners' ? 'Nama media, editor, wilayah…' : 'Judul konten atau kanal…'"
+            :class="inputClass"
           />
         </div>
         <div v-if="tab === 'partners'">
-          <label class="text-xs font-medium text-banten-navy/70">Status mitra</label>
-          <select v-model="filters.active" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+          <label class="text-[10px] font-bold uppercase tracking-wider text-[#6e7681]">Status mitra</label>
+          <select v-model="filters.active" :class="inputClass">
             <option value="">Semua</option>
             <option value="1">Aktif</option>
             <option value="0">Nonaktif</option>
           </select>
         </div>
         <div v-if="tab === 'logs'">
-          <label class="text-xs font-medium text-banten-navy/70">Status blast</label>
-          <select v-model="filters.blast_status" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+          <label class="text-[10px] font-bold uppercase tracking-wider text-[#6e7681]">Status blast</label>
+          <select v-model="filters.blast_status" :class="inputClass">
             <option value="">Semua</option>
-            <option value="sent">Sent</option>
-            <option value="partial">Partial</option>
-            <option value="failed">Failed</option>
-            <option value="pending">Pending</option>
+            <option value="sent">Terkirim</option>
+            <option value="partial">Sebagian</option>
+            <option value="failed">Gagal</option>
+            <option value="pending">Menunggu</option>
           </select>
         </div>
-      </div>
-      <div class="mt-4 flex flex-wrap gap-2">
-        <button type="submit" class="rounded-md bg-banten-navy px-4 py-2 text-sm text-white">Cari</button>
-        <button type="button" class="rounded-md border border-banten-navy/20 px-4 py-2 text-sm text-banten-navy" @click="resetFilters">
-          Reset
-        </button>
+        <div class="flex flex-wrap gap-2">
+          <button type="submit" class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-emerald-400">Terapkan</button>
+          <button type="button" class="rounded-xl border border-[#30363d] px-4 py-2.5 text-sm text-[#c9d1d9] hover:bg-[#21262d]" @click="resetFilters">
+            Reset
+          </button>
+        </div>
       </div>
     </form>
 
-    <div v-if="loading" class="text-sm text-banten-navy/60">Memuat...</div>
-    <div v-else-if="error" class="rounded-md border border-banten-red/30 bg-red-50 px-4 py-3 text-sm text-banten-red">
+    <div v-if="loading" class="space-y-3">
+      <div v-for="n in 3" :key="n" class="h-28 animate-pulse rounded-2xl border border-[#30363d] bg-[#161b22]" />
+    </div>
+    <div v-else-if="error" class="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
       {{ error }}
     </div>
 
@@ -398,7 +463,7 @@ onMounted(load)
           <button
             v-if="canManage"
             type="button"
-            class="rounded-md bg-banten-navy px-3 py-2 text-xs text-white"
+            class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-emerald-400"
             @click="showForm = !showForm; if (!showForm) resetPartnerForm()"
           >
             {{ showForm ? 'Tutup' : '+ Tambah Mitra' }}
@@ -407,172 +472,171 @@ onMounted(load)
 
         <form
           v-if="showForm && canManage"
-          class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-5"
+          class="mb-6 rounded-2xl border border-emerald-500/25 bg-[#161b22] p-5"
           @submit.prevent="savePartner"
         >
-          <h2 class="font-display text-lg text-banten-navy">
+          <h2 class="text-base font-semibold text-white">
             {{ editingId ? 'Edit Media Mitra' : 'Media Mitra Baru' }}
           </h2>
           <div class="mt-4 grid gap-3 md:grid-cols-2">
             <div>
-              <label class="text-sm font-medium text-banten-navy">Nama media</label>
-              <input v-model="partnerForm.name" required class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm" />
+              <label class="text-[11px] font-medium text-[#8b949e]">Nama media</label>
+              <input v-model="partnerForm.name" required :class="inputClass" />
             </div>
             <div>
-              <label class="text-sm font-medium text-banten-navy">Pemred / kontak</label>
-              <input v-model="partnerForm.editor_name" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm" />
+              <label class="text-[11px] font-medium text-[#8b949e]">Pemred / kontak</label>
+              <input v-model="partnerForm.editor_name" :class="inputClass" />
             </div>
             <div>
-              <label class="text-sm font-medium text-banten-navy">WhatsApp</label>
-              <input v-model="partnerForm.whatsapp" placeholder="62812..." class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm" />
+              <label class="text-[11px] font-medium text-[#8b949e]">WhatsApp</label>
+              <input v-model="partnerForm.whatsapp" placeholder="62812…" :class="inputClass" />
             </div>
             <div>
-              <label class="text-sm font-medium text-banten-navy">Email</label>
-              <input v-model="partnerForm.email" type="email" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm" />
+              <label class="text-[11px] font-medium text-[#8b949e]">Email</label>
+              <input v-model="partnerForm.email" type="email" :class="inputClass" />
             </div>
             <div>
-              <label class="text-sm font-medium text-banten-navy">Wilayah coverage</label>
-              <input v-model="partnerForm.coverage_area" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm" />
+              <label class="text-[11px] font-medium text-[#8b949e]">Wilayah coverage</label>
+              <input v-model="partnerForm.coverage_area" :class="inputClass" />
             </div>
             <div>
-              <label class="text-sm font-medium text-banten-navy">Kanal darurat krisis</label>
-              <input v-model="partnerForm.crisis_channel" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm" />
+              <label class="text-[11px] font-medium text-[#8b949e]">Kanal darurat krisis</label>
+              <input v-model="partnerForm.crisis_channel" :class="inputClass" />
             </div>
           </div>
-          <p v-if="formError" class="mt-3 text-sm text-banten-red">{{ formError }}</p>
-          <button type="submit" class="mt-4 rounded-md bg-banten-navy px-4 py-2 text-sm text-white disabled:opacity-60" :disabled="saving">
+          <p v-if="formError" class="mt-3 text-sm text-rose-400">{{ formError }}</p>
+          <button type="submit" class="mt-4 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-60" :disabled="saving">
             {{ saving ? 'Menyimpan...' : 'Simpan' }}
           </button>
         </form>
 
-        <div v-if="!partners.length" class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-12 text-center text-sm text-banten-navy/60">
+        <div v-if="!partners.length" class="rounded-2xl border border-dashed border-[#30363d] bg-[#161b22]/60 px-6 py-12 text-center text-sm text-[#8b949e]">
           Belum ada media mitra.
         </div>
-        <div v-else class="overflow-x-auto rounded-xl border border-banten-navy/10 bg-white/80">
-          <table class="min-w-full text-left text-sm">
-            <thead class="border-b border-banten-navy/10 bg-banten-sand/50 text-xs uppercase text-banten-navy/60">
-              <tr>
-                <th class="px-4 py-3">Media</th>
-                <th class="px-4 py-3">Kontak</th>
-                <th class="px-4 py-3">Coverage</th>
-                <th class="px-4 py-3">Status</th>
-                <th v-if="canManage" class="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="p in partners" :key="p.id" class="border-b border-banten-navy/5">
-                <td class="px-4 py-3">
-                  <p class="font-medium text-banten-navy">{{ p.name }}</p>
-                  <p class="text-xs text-banten-navy/55">{{ p.editor_name || '—' }}</p>
-                </td>
-                <td class="px-4 py-3 text-xs text-banten-navy/70">
-                  <p>WA: {{ p.whatsapp || '—' }}</p>
-                  <p>{{ p.email || '—' }}</p>
-                </td>
-                <td class="px-4 py-3 text-xs text-banten-navy/70">{{ p.coverage_area || '—' }}</td>
-                <td class="px-4 py-3">
-                  <span
-                    class="rounded px-2 py-0.5 text-xs font-semibold"
-                    :class="p.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'"
-                  >
-                    {{ p.is_active ? 'aktif' : 'nonaktif' }}
-                  </span>
-                </td>
-                <td v-if="canManage" class="px-4 py-3 text-right text-xs">
-                  <button type="button" class="text-banten-gold hover:underline" @click="editPartner(p)">Edit</button>
-                  <button
-                    v-if="p.is_active"
-                    type="button"
-                    class="ml-3 text-banten-red hover:underline"
-                    @click="deactivate(p)"
-                  >
-                    Nonaktifkan
-                  </button>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-else class="space-y-3">
+          <article
+            v-for="p in partners"
+            :key="p.id"
+            class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22]"
+          >
+            <div
+              class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent"
+              :class="p.is_active ? 'from-emerald-500/80' : 'from-slate-500/80'"
+              aria-hidden="true"
+            />
+            <div class="px-5 py-4 pl-6">
+              <div class="flex items-start justify-between gap-3">
+                <h2 class="text-base font-semibold text-white">{{ p.name }}</h2>
+                <span
+                  class="shrink-0 inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                  :class="p.is_active ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-slate-500/40 bg-slate-500/10 text-slate-300'"
+                >
+                  {{ p.is_active ? 'Aktif' : 'Nonaktif' }}
+                </span>
+              </div>
+              <p class="mt-1 text-sm text-[#8b949e]">{{ p.editor_name || 'Kontak belum diisi' }}</p>
+              <div class="mt-3 flex flex-wrap gap-2 text-[11px]">
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">WA {{ p.whatsapp || '—' }}</span>
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">{{ p.email || 'Email —' }}</span>
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">{{ p.coverage_area || 'Wilayah —' }}</span>
+                <span v-if="p.crisis_channel" class="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1 text-amber-200">
+                  Krisis: {{ p.crisis_channel }}
+                </span>
+              </div>
+            </div>
+            <div v-if="canManage" class="flex gap-4 border-t border-[#30363d]/80 px-5 py-2.5 pl-6 text-xs font-semibold">
+              <button type="button" class="text-emerald-300 hover:text-emerald-200" @click="editPartner(p)">Edit</button>
+              <button v-if="p.is_active" type="button" class="text-rose-300 hover:text-rose-200" @click="deactivate(p)">
+                Nonaktifkan
+              </button>
+            </div>
+          </article>
         </div>
         <PaginationBar :meta="partnersMeta" @update:page="onPartnersPage" />
       </div>
 
       <!-- Blast -->
       <div v-else-if="tab === 'blast'">
-        <div v-if="!canManage" class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-12 text-center text-sm text-banten-navy/60">
+        <div v-if="!canManage" class="rounded-2xl border border-dashed border-[#30363d] bg-[#161b22]/60 px-6 py-12 text-center text-sm text-[#8b949e]">
           Hanya editor / admin media yang dapat mengirim blast.
         </div>
         <div v-else class="space-y-5">
-          <div
-            v-if="messagingStatus"
-            class="rounded-xl border border-banten-navy/10 bg-white/90 px-4 py-3 text-xs text-banten-navy/75"
-          >
-            Gateway:
-            <span :class="messagingStatus.whatsapp?.enabled ? 'text-emerald-700' : 'text-amber-700'">
-              WA Fonnte {{ messagingStatus.whatsapp?.enabled ? 'aktif' : 'belum token' }}
+          <div v-if="messagingStatus" class="flex flex-wrap gap-2">
+            <span
+              class="inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold"
+              :class="messagingStatus.whatsapp?.enabled ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'"
+            >
+              WhatsApp {{ messagingStatus.whatsapp?.enabled ? 'aktif' : 'belum ada token' }}
             </span>
-            ·
-            <span :class="messagingStatus.mail?.enabled ? 'text-emerald-700' : 'text-amber-700'">
-              Email SMTP {{ messagingStatus.mail?.enabled ? `aktif (${messagingStatus.mail.host}:${messagingStatus.mail.port})` : 'nonaktif (MAIL_ENABLED)' }}
+            <span
+              class="inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-semibold"
+              :class="messagingStatus.mail?.enabled ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'"
+            >
+              Email {{ messagingStatus.mail?.enabled ? `aktif · ${messagingStatus.mail.host}` : 'nonaktif' }}
             </span>
           </div>
 
-          <form class="rounded-xl border border-banten-navy/10 bg-white/90 p-5" @submit.prevent="runBlast">
-          <h2 class="font-display text-lg text-banten-navy">One-Click Media Blast</h2>
-          <p class="mt-1 text-xs text-banten-navy/60">
-            Kirim konten approved ke media mitra via WhatsApp (Fonnte) + Email (SMTP).
+          <form class="rounded-2xl border border-[#30363d] bg-[#161b22] p-5" @submit.prevent="runBlast">
+          <h2 class="text-base font-semibold text-white">One-Click Media Blast</h2>
+          <p class="mt-1 text-xs text-[#8b949e]">
+            Kirim konten yang sudah disetujui ke mitra lewat WhatsApp dan email.
           </p>
 
-          <label class="mt-4 block text-sm font-medium text-banten-navy">Konten approved</label>
-          <select
-            v-model="blastForm.content_id"
-            required
-            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
-          >
+          <label class="mt-4 block text-[11px] font-medium text-[#8b949e]">Konten approved</label>
+          <select v-model="blastForm.content_id" required :class="inputClass">
             <option v-if="!readyContent.length" value="" disabled>Tidak ada konten approved</option>
             <option v-for="c in readyContent" :key="c.id" :value="c.id">
               {{ c.title }} · {{ c.issue_title || `Isu #${c.issue_id}` }}
             </option>
           </select>
 
-          <label class="mt-4 block text-sm font-medium text-banten-navy">Kanal</label>
-          <div class="mt-2 flex flex-wrap gap-4 text-sm">
-            <label class="flex items-center gap-2">
-              <input v-model="blastForm.channel" type="radio" value="both" /> WA + Email
-            </label>
-            <label class="flex items-center gap-2">
-              <input v-model="blastForm.channel" type="radio" value="whatsapp" /> WhatsApp saja
-            </label>
-            <label class="flex items-center gap-2">
-              <input v-model="blastForm.channel" type="radio" value="email" /> Email saja
+          <p class="mt-4 text-[11px] font-medium text-[#8b949e]">Kanal</p>
+          <div class="mt-2 flex flex-wrap gap-2 text-sm">
+            <label
+              v-for="opt in [
+                { value: 'both', label: 'WA + Email' },
+                { value: 'whatsapp', label: 'WhatsApp saja' },
+                { value: 'email', label: 'Email saja' },
+              ]"
+              :key="opt.value"
+              class="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2"
+              :class="blastForm.channel === opt.value ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-[#30363d] text-[#c9d1d9]'"
+            >
+              <input v-model="blastForm.channel" type="radio" :value="opt.value" class="accent-emerald-500" />
+              {{ opt.label }}
             </label>
           </div>
 
           <div class="mt-4 flex items-center justify-between">
-            <p class="text-sm font-medium text-banten-navy">Penerima</p>
-            <button type="button" class="text-xs text-banten-gold hover:underline" @click="toggleSelectAll">
+            <p class="text-sm font-medium text-white">
+              Penerima
+              <span class="ml-1 text-xs font-normal text-[#6e7681]">{{ blastForm.partner_ids.length }} dipilih</span>
+            </p>
+            <button type="button" class="text-xs font-semibold text-emerald-300 hover:text-emerald-200" @click="toggleSelectAll">
               {{ selectAll ? 'Kosongkan' : 'Pilih semua aktif' }}
             </button>
           </div>
-          <div class="mt-2 max-h-56 space-y-2 overflow-y-auto rounded-md border border-banten-navy/10 p-3">
+          <div class="mt-2 max-h-56 space-y-2 overflow-y-auto rounded-xl border border-[#30363d] bg-[#0d1117] p-3">
             <label
               v-for="p in partnersAll.filter((x) => x.is_active)"
               :key="p.id"
-              class="flex items-center gap-3 text-sm"
+              class="flex items-center gap-3 rounded-lg px-2 py-1.5 text-sm hover:bg-[#161b22]"
             >
               <input
                 type="checkbox"
+                class="accent-emerald-500"
                 :checked="blastForm.partner_ids.includes(p.id)"
                 @change="togglePartner(p.id)"
               />
-              <span class="text-banten-navy">{{ p.name }}</span>
-              <span class="text-xs text-banten-navy/50">{{ p.whatsapp }} · {{ p.email }}</span>
+              <span class="text-[#e6edf3]">{{ p.name }}</span>
+              <span class="text-xs text-[#6e7681]">{{ p.whatsapp || '—' }} · {{ p.email || '—' }}</span>
             </label>
           </div>
 
-          <p v-if="formError" class="mt-3 text-sm text-banten-red">{{ formError }}</p>
+          <p v-if="formError" class="mt-3 text-sm text-rose-400">{{ formError }}</p>
           <button
             type="submit"
-            class="mt-5 rounded-md bg-banten-red px-5 py-2.5 text-sm font-medium text-white disabled:opacity-60"
+            class="mt-5 rounded-lg bg-rose-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-400 disabled:opacity-60"
             :disabled="blasting || !blastForm.content_id || !blastForm.partner_ids.length"
           >
             {{ blasting ? 'Mengirim...' : 'Blast Sekarang' }}
@@ -580,16 +644,16 @@ onMounted(load)
 
           <div
             v-if="blastResult"
-            class="mt-4 rounded-md border px-4 py-3 text-sm"
-            :class="statusColor[blastResult.status]"
+            class="mt-4 rounded-xl border px-4 py-3 text-sm"
+            :class="blastStatus(blastResult.status).chip"
           >
-            Blast #{{ blastResult.id }} · {{ blastResult.status }} ·
+            Blast #{{ blastResult.id }} · {{ blastStatus(blastResult.status).label }} ·
             terkirim {{ blastResult.result?.sent || 0 }}, gagal {{ blastResult.result?.failed || 0 }}
           </div>
           </form>
 
           <div class="grid gap-5 md:grid-cols-2">
-            <form class="rounded-xl border border-banten-navy/10 bg-white/90 p-5" @submit.prevent="runTestEmail">
+            <form class="rounded-2xl border border-[#30363d] bg-[#161b22] p-5" @submit.prevent="runTestEmail">
               <h3 class="font-display text-base text-banten-navy">Uji kirim email</h3>
               <p class="mt-1 text-xs text-banten-navy/60">Kirim satu email uji lewat SMTP Media Hub.</p>
               <label class="mt-3 block text-xs font-medium text-banten-navy/70">Ke</label>
@@ -598,13 +662,13 @@ onMounted(load)
                 type="email"
                 required
                 placeholder="nama@domain.go.id"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+                :class="inputClass"
               />
               <label class="mt-3 block text-xs font-medium text-banten-navy/70">Subjek</label>
               <input
                 v-model="testEmailForm.subject"
                 type="text"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+                :class="inputClass"
               />
               <button
                 type="submit"
@@ -624,7 +688,7 @@ onMounted(load)
               </p>
             </form>
 
-            <form class="rounded-xl border border-banten-navy/10 bg-white/90 p-5" @submit.prevent="runTestWhatsapp">
+            <form class="rounded-2xl border border-[#30363d] bg-[#161b22] p-5" @submit.prevent="runTestWhatsapp">
               <h3 class="font-display text-base text-banten-navy">Uji kirim WhatsApp</h3>
               <p class="mt-1 text-xs text-banten-navy/60">
                 Via
@@ -641,13 +705,13 @@ onMounted(load)
                 type="text"
                 required
                 placeholder="0812… atau 62812…"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+                :class="inputClass"
               />
               <label class="mt-3 block text-xs font-medium text-banten-navy/70">Pesan (opsional)</label>
               <textarea
                 v-model="testWaForm.message"
                 rows="2"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+                :class="inputClass"
                 placeholder="Kosongkan untuk pesan uji default"
               />
               <button
@@ -674,13 +738,13 @@ onMounted(load)
       <!-- SLA -->
       <div v-else-if="tab === 'sla'">
         <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
-          <p class="text-sm text-banten-navy/65">
-            Target SLA tayang: <strong>{{ slaMinutes }} menit</strong> setelah blast
+          <p class="text-sm text-[#8b949e]">
+            Target tayang <strong class="text-white">{{ slaMinutes }} menit</strong> setelah blast.
           </p>
           <button
             v-if="canManage"
             type="button"
-            class="rounded-md bg-banten-navy px-3 py-2 text-xs text-white"
+            class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-black hover:bg-emerald-400"
             @click="showSlaForm = !showSlaForm"
           >
             {{ showSlaForm ? 'Tutup' : '+ Catat SLA' }}
@@ -689,20 +753,20 @@ onMounted(load)
 
         <form
           v-if="showSlaForm && canManage"
-          class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-5"
+          class="mb-6 rounded-2xl border border-[#30363d] bg-[#161b22] p-5"
           @submit.prevent="saveSla"
         >
           <h2 class="font-display text-lg text-banten-navy">Catat Kepatuhan SLA</h2>
           <div class="mt-4 grid gap-3 md:grid-cols-2">
             <div>
               <label class="text-sm font-medium text-banten-navy">Media mitra</label>
-              <select v-model="slaForm.media_partner_id" required class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+              <select v-model="slaForm.media_partner_id" required :class="inputClass">
                 <option v-for="p in partnersAll" :key="p.id" :value="p.id">{{ p.name }}</option>
               </select>
             </div>
             <div>
               <label class="text-sm font-medium text-banten-navy">Blast terkait (opsional)</label>
-              <select v-model="slaForm.blast_log_id" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
+              <select v-model="slaForm.blast_log_id" :class="inputClass">
                 <option value="">— tanpa blast —</option>
                 <option v-for="b in blasts" :key="b.id" :value="b.id">
                   Blast #{{ b.id }} · {{ b.sent_at }}
@@ -711,7 +775,7 @@ onMounted(load)
             </div>
             <div>
               <label class="text-sm font-medium text-banten-navy">Waktu tayang</label>
-              <input v-model="slaForm.published_at" type="datetime-local" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm" />
+              <input v-model="slaForm.published_at" type="datetime-local" :class="inputClass" />
             </div>
             <div>
               <label class="text-sm font-medium text-banten-navy">Response (menit, opsional)</label>
@@ -720,7 +784,7 @@ onMounted(load)
                 type="number"
                 min="0"
                 placeholder="auto dari blast jika diisi"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+                :class="inputClass"
               />
             </div>
             <div class="md:col-span-2">
@@ -731,75 +795,77 @@ onMounted(load)
             </div>
             <div class="md:col-span-2">
               <label class="text-sm font-medium text-banten-navy">Catatan</label>
-              <input v-model="slaForm.notes" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm" />
+              <input v-model="slaForm.notes" :class="inputClass" />
             </div>
           </div>
           <p v-if="formError" class="mt-3 text-sm text-banten-red">{{ formError }}</p>
-          <button type="submit" class="mt-4 rounded-md bg-banten-navy px-4 py-2 text-sm text-white disabled:opacity-60" :disabled="saving">
+          <button type="submit" class="mt-4 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-semibold text-black hover:bg-emerald-400 disabled:opacity-60" :disabled="saving">
             {{ saving ? 'Menyimpan...' : 'Simpan SLA' }}
           </button>
         </form>
 
-        <div class="mb-6 overflow-x-auto rounded-xl border border-banten-navy/10 bg-white/80">
-          <table class="min-w-full text-left text-sm">
-            <thead class="border-b border-banten-navy/10 bg-banten-sand/50 text-xs uppercase text-banten-navy/60">
-              <tr>
-                <th class="px-4 py-3">Peringkat</th>
-                <th class="px-4 py-3">Media</th>
-                <th class="px-4 py-3">Compliance</th>
-                <th class="px-4 py-3">Avg respon</th>
-                <th class="px-4 py-3">Log</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="(r, idx) in slaRanking" :key="r.partner_id" class="border-b border-banten-navy/5">
-                <td class="px-4 py-3 font-semibold text-banten-navy">#{{ idx + 1 }}</td>
-                <td class="px-4 py-3 text-banten-navy">{{ r.partner_name }}</td>
-                <td class="px-4 py-3">
-                  <span v-if="r.compliance_rate == null" class="text-banten-navy/45">—</span>
-                  <span
-                    v-else
-                    class="rounded px-2 py-0.5 text-xs font-semibold"
-                    :class="r.compliance_rate >= 80 ? 'bg-emerald-100 text-emerald-800' : r.compliance_rate >= 50 ? 'bg-amber-100 text-amber-800' : 'bg-red-100 text-red-800'"
-                  >
-                    {{ r.compliance_rate }}%
-                  </span>
-                </td>
-                <td class="px-4 py-3 text-banten-navy/70">
-                  {{ r.avg_response_minutes != null ? `${r.avg_response_minutes} mnt` : '—' }}
-                </td>
-                <td class="px-4 py-3 text-banten-navy/70">{{ r.compliant }}/{{ r.total_logs }}</td>
-              </tr>
-            </tbody>
-          </table>
+        <div v-if="!slaRanking.length" class="mb-6 rounded-2xl border border-dashed border-[#30363d] px-6 py-10 text-center text-sm text-[#8b949e]">
+          Belum ada peringkat mitra.
+        </div>
+        <div v-else class="mb-6 grid gap-3 sm:grid-cols-2">
+          <article
+            v-for="(r, idx) in slaRanking"
+            :key="r.partner_id"
+            class="rounded-2xl border border-[#30363d] bg-[#161b22] px-4 py-3"
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <p class="text-[11px] font-semibold text-[#6e7681]">#{{ idx + 1 }}</p>
+                <h3 class="text-sm font-semibold text-white">{{ r.partner_name }}</h3>
+              </div>
+              <span
+                v-if="r.compliance_rate != null"
+                class="rounded-md border px-2 py-0.5 text-xs font-semibold"
+                :class="r.compliance_rate >= 80 ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : r.compliance_rate >= 50 ? 'border-amber-500/40 bg-amber-500/10 text-amber-300' : 'border-rose-500/40 bg-rose-500/10 text-rose-300'"
+              >
+                {{ r.compliance_rate }}%
+              </span>
+              <span v-else class="text-xs text-[#6e7681]">Belum ada log</span>
+            </div>
+            <div class="mt-3 h-1.5 overflow-hidden rounded-full bg-[#30363d]">
+              <div
+                class="h-full rounded-full bg-emerald-400"
+                :style="{ width: `${Math.min(100, r.compliance_rate || 0)}%` }"
+              />
+            </div>
+            <p class="mt-2 text-[11px] text-[#8b949e]">
+              Rata respon {{ r.avg_response_minutes != null ? `${r.avg_response_minutes} mnt` : '—' }}
+              · patuh {{ r.compliant }}/{{ r.total_logs }}
+            </p>
+          </article>
         </div>
 
-        <h3 class="mb-3 font-display text-lg text-banten-navy">Histori SLA</h3>
-        <div v-if="!slaLogs.length" class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-10 text-center text-sm text-banten-navy/60">
+        <h3 class="mb-3 text-base font-semibold text-white">Histori SLA</h3>
+        <div v-if="!slaLogs.length" class="rounded-2xl border border-dashed border-[#30363d] px-6 py-10 text-center text-sm text-[#8b949e]">
           Belum ada catatan SLA.
         </div>
         <div v-else class="space-y-2">
           <article
             v-for="s in slaLogs"
             :key="s.id"
-            class="rounded-xl border border-banten-navy/10 bg-white/80 px-4 py-3 text-sm"
+            class="rounded-2xl border border-[#30363d] bg-[#161b22] px-4 py-3 text-sm"
           >
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <div>
+              <div class="flex items-center gap-2">
                 <span
-                  class="rounded px-2 py-0.5 text-xs font-semibold"
-                  :class="s.sla_compliant ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'"
+                  class="rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                  :class="s.sla_compliant ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300' : 'border-rose-500/40 bg-rose-500/10 text-rose-300'"
                 >
-                  {{ s.sla_compliant ? 'compliant' : 'breach' }}
+                  {{ s.sla_compliant ? 'Patuh' : 'Lewat SLA' }}
                 </span>
-                <span class="ml-2 font-medium text-banten-navy">{{ s.partner_name }}</span>
+                <span class="font-medium text-white">{{ s.partner_name }}</span>
               </div>
-              <span class="text-xs text-banten-navy/55">
+              <span class="text-xs text-[#8b949e]">
                 {{ s.response_minutes != null ? `${s.response_minutes} menit` : '—' }}
-                · match: {{ s.content_match ? 'ya' : 'tidak' }}
+                · isi sesuai {{ s.content_match ? 'ya' : 'tidak' }}
               </span>
             </div>
-            <p v-if="s.notes" class="mt-1 text-xs text-banten-navy/60">{{ s.notes }}</p>
+            <p v-if="s.notes" class="mt-2 text-xs text-[#c9d1d9]">{{ s.notes }}</p>
           </article>
         </div>
         <PaginationBar :meta="slaMeta" @update:page="onSlaPage" />
@@ -807,38 +873,35 @@ onMounted(load)
 
       <!-- Logs -->
       <div v-else>
-        <div v-if="!blasts.length" class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-12 text-center text-sm text-banten-navy/60">
+        <div v-if="!blasts.length" class="rounded-2xl border border-dashed border-[#30363d] bg-[#161b22]/60 px-6 py-12 text-center text-sm text-[#8b949e]">
           Belum ada riwayat blast.
         </div>
         <div v-else class="space-y-3">
           <article
             v-for="b in blasts"
             :key="b.id"
-            class="rounded-xl border border-banten-navy/10 bg-white/80 px-5 py-4"
+            class="rounded-2xl border border-[#30363d] bg-[#161b22] px-5 py-4"
           >
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="statusColor[b.status]">
-                    {{ b.status }}
-                  </span>
-                  <span class="text-xs text-banten-navy/50">{{ b.channel }}</span>
-                </div>
-                <p class="mt-2 font-display text-lg text-banten-navy">
-                  Blast #{{ b.id }} · Konten #{{ b.content_id }}
-                </p>
-                <p class="mt-1 text-xs text-banten-navy/60">
-                  {{ b.recipients?.length || 0 }} mitra ·
-                  terkirim {{ b.result?.sent || 0 }} · gagal {{ b.result?.failed || 0 }} ·
-                  {{ b.sent_at }}
-                </p>
-              </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <span class="inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold" :class="blastStatus(b.status).chip">
+                {{ blastStatus(b.status).label }}
+              </span>
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[11px] text-[#c9d1d9]">
+                {{ CHANNEL_LABEL[b.channel] || b.channel }}
+              </span>
             </div>
+            <p class="mt-2 text-base font-semibold text-white">
+              Blast #{{ b.id }}
+            </p>
+            <p class="mt-1 text-sm text-[#8b949e]">
+              {{ b.recipients?.length || 0 }} mitra · terkirim {{ b.result?.sent || 0 }} · gagal {{ b.result?.failed || 0 }}
+            </p>
+            <p class="mt-1 text-[11px] text-[#6e7681]">{{ formatDateTime(b.sent_at) }}</p>
             <details v-if="b.result?.deliveries?.length" class="mt-3">
-              <summary class="cursor-pointer text-xs text-banten-gold">Detail pengiriman</summary>
-              <ul class="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-banten-navy/70">
+              <summary class="cursor-pointer text-xs font-semibold text-emerald-300">Detail pengiriman</summary>
+              <ul class="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-[#c9d1d9]">
                 <li v-for="(d, i) in b.result.deliveries" :key="i">
-                  {{ d.partner_name }} · {{ d.channel }} → {{ d.to }} · {{ d.status }}
+                  {{ d.partner_name }} · {{ CHANNEL_LABEL[d.channel] || d.channel }} → {{ d.to }} · {{ blastStatus(d.status).label }}
                 </li>
               </ul>
             </details>

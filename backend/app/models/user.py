@@ -34,6 +34,7 @@ class User(db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(150), nullable=False)
+    phone = db.Column(db.String(30))
     role_id = db.Column(db.Integer, db.ForeignKey("roles.id"), nullable=False)
     opd_id = db.Column(db.Integer, db.ForeignKey("opds.id"), index=True)
     opd_name = db.Column(db.String(255))
@@ -62,6 +63,7 @@ class User(db.Model):
             "username": self.username,
             "email": self.email,
             "full_name": self.full_name,
+            "phone": self.phone,
             "role": self.role.to_dict() if self.role else None,
             "opd_id": self.opd_id,
             "opd_name": self.opd_name or (self.opd.name if self.opd else None),

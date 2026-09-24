@@ -18,6 +18,7 @@ def register_blueprints(app: Flask) -> None:
     from app.api.missions import bp as missions_bp
     from app.api.opds import bp as opds_bp
     from app.api.reports import bp as reports_bp
+    from app.api.settings import bp as settings_bp
     from app.api.users import bp as users_bp
     from app.api.validations import bp as validations_bp
 
@@ -36,4 +37,5 @@ def register_blueprints(app: Flask) -> None:
     app.register_blueprint(agenda_bp, url_prefix="/api/agenda")
     app.register_blueprint(dashboard_bp, url_prefix="/api/dashboard")
     app.register_blueprint(reports_bp, url_prefix="/api/reports")
+    app.register_blueprint(settings_bp, url_prefix="/api/settings")
     app.register_blueprint(opds_bp, url_prefix="/api/opds")

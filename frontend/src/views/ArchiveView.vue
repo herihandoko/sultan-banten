@@ -82,6 +82,77 @@ function toggleTimeline(id) {
   expandedId.value = expandedId.value === id ? null : id
 }
 
+const RISK_ACCENT = {
+  R0: 'from-slate-400/80',
+  R1: 'from-sky-400/80',
+  R2: 'from-amber-400/80',
+  R3: 'from-orange-400/80',
+  R4: 'from-rose-400/80',
+  R5: 'from-red-500/80',
+}
+
+const CONTENT_STATUS = {
+  draft: { label: 'Draft', chip: 'border-slate-500/40 bg-slate-500/10 text-slate-300', accent: 'from-slate-400/80' },
+  in_review: { label: 'Review', chip: 'border-amber-500/40 bg-amber-500/10 text-amber-300', accent: 'from-amber-400/80' },
+  approved: { label: 'Disetujui', chip: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300', accent: 'from-emerald-500/80' },
+  rejected: { label: 'Ditolak', chip: 'border-rose-500/40 bg-rose-500/10 text-rose-300', accent: 'from-rose-500/80' },
+  published: { label: 'Terbit', chip: 'border-sky-500/40 bg-sky-500/10 text-sky-300', accent: 'from-sky-500/80' },
+}
+
+const CONTENT_TYPE = {
+  text_release: { label: 'Rilis Teks', accent: 'from-sky-500/80' },
+  infographic: { label: 'Infografis', accent: 'from-amber-400/80' },
+  video: { label: 'Video', accent: 'from-violet-500/80' },
+}
+
+const SOURCE_LABEL = {
+  mata_bathin: 'Mata Bathin',
+  sipantau: 'SIPANTAU',
+  manual: 'Manual',
+}
+
+function riskAccent(level) {
+  return RISK_ACCENT[level] || 'from-slate-400/80'
+}
+
+function contentStatus(item) {
+  return CONTENT_STATUS[item.status] || { label: item.status, chip: 'border-[#30363d] text-[#c9d1d9]', accent: 'from-slate-400/80' }
+}
+
+function contentType(item) {
+  return CONTENT_TYPE[item.content_type] || { label: item.content_type, accent: 'from-slate-400/80' }
+}
+
+function sourceLabel(source) {
+  return SOURCE_LABEL[source] || source || '—'
+}
+
+function formatDateTime(iso) {
+  if (!iso) return ''
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`
+  const d = new Date(normalized)
+  if (Number.isNaN(d.getTime())) return iso
+  const date = d.toLocaleDateString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+  const time = d.toLocaleTimeString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return `${date} · ${time} WIB`
+}
+
+function excerpt(text) {
+  const clean = (text || '').replace(/\s+/g, ' ').trim()
+  if (!clean) return 'Belum ada ringkasan.'
+  return clean.length > 180 ? `${clean.slice(0, 177)}…` : clean
+}
+
 onMounted(search)
 
 watch(
@@ -185,7 +256,7 @@ watch(
         <h2 class="mb-3 font-display text-xl text-banten-navy">Isu</h2>
         <div
           v-if="!issues.length"
-          class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-10 text-center text-sm text-banten-navy/60"
+          class="rounded-2xl border border-dashed border-[#30363d] bg-[#161b22]/60 px-6 py-12 text-center text-sm text-[#8b949e]"
         >
           Tidak ada isu yang cocok.
         </div>
@@ -193,32 +264,56 @@ watch(
           <article
             v-for="issue in issues"
             :key="issue.id"
-            class="rounded-xl border border-banten-navy/10 bg-white/80 px-5 py-4"
+            class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22]"
           >
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <RiskBadge :level="issue.risk_level" show-label />
-                  <IssueStatusBadge :status="issue.status" />
-                </div>
-                <h3 class="mt-2 font-display text-xl text-banten-navy">
-                  <RouterLink :to="`/issues/${issue.id}`" class="hover:text-banten-gold">
+            <div
+              class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent"
+              :class="riskAccent(issue.risk_level)"
+              aria-hidden="true"
+            />
+            <div class="px-5 py-4 pl-6">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold leading-snug text-white sm:text-lg">
+                  <RouterLink :to="`/issues/${issue.id}`" class="transition hover:text-emerald-300">
                     {{ issue.title }}
                   </RouterLink>
                 </h3>
-                <p class="mt-1 line-clamp-2 text-sm text-banten-navy/70">
-                  {{ issue.summary || issue.why_now || '—' }}
-                </p>
-                <p class="mt-2 text-xs text-banten-navy/55">
-                  Evidence {{ issue.archive.evidence_count }} ·
-                  Validasi {{ issue.archive.validated_count }}/{{ issue.archive.validation_count }} ·
-                  Konten {{ issue.archive.content_approved }}/{{ issue.archive.content_count }} ·
-                  Blast {{ issue.archive.blast_count }}
-                </p>
+                <IssueStatusBadge :status="issue.status" tone="outline" class="shrink-0" />
               </div>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <RiskBadge :level="issue.risk_level" show-label tone="outline" />
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-[#c9d1d9]">
+                  {{ issue.source_label || sourceLabel(issue.source) }}
+                </span>
+                <span v-if="issue.created_at" class="text-[11px] text-[#6e7681]">
+                  {{ formatDateTime(issue.created_at) }}
+                </span>
+              </div>
+              <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-[#8b949e]">
+                {{ excerpt(issue.summary || issue.why_now) }}
+              </p>
+              <div class="mt-3 flex flex-wrap gap-2">
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-[#c9d1d9]">
+                  {{ issue.archive.evidence_count }} evidence
+                </span>
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-[#c9d1d9]">
+                  Validasi {{ issue.archive.validated_count }}/{{ issue.archive.validation_count }}
+                </span>
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-[#c9d1d9]">
+                  Konten {{ issue.archive.content_approved }}/{{ issue.archive.content_count }}
+                </span>
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+                  {{ issue.archive.blast_count }} blast
+                </span>
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-3 border-t border-[#30363d]/80 px-5 py-2.5 pl-6">
+              <RouterLink :to="`/issues/${issue.id}`" class="text-[11px] font-medium text-[#6e7681] hover:text-emerald-400">
+                Buka isu
+              </RouterLink>
               <button
                 type="button"
-                class="text-xs text-banten-gold hover:underline"
+                class="text-[11px] font-semibold text-emerald-300 hover:text-emerald-200"
                 @click="toggleTimeline(issue.id)"
               >
                 {{ expandedId === issue.id ? 'Tutup timeline' : 'Lihat timeline' }}
@@ -226,15 +321,18 @@ watch(
             </div>
             <ol
               v-if="expandedId === issue.id"
-              class="mt-4 space-y-2 border-t border-banten-navy/10 pt-3"
+              class="space-y-2 border-t border-[#30363d]/80 px-5 py-3 pl-6"
             >
               <li
                 v-for="(ev, idx) in issue.archive.timeline"
                 :key="idx"
-                class="flex gap-3 text-xs text-banten-navy/70"
+                class="flex gap-3 text-xs"
               >
-                <span class="w-40 shrink-0 text-banten-navy/40">{{ ev.at }}</span>
-                <span>{{ ev.label }}</span>
+                <span class="w-44 shrink-0 text-[#6e7681]">{{ formatDateTime(ev.at) }}</span>
+                <span class="text-[#c9d1d9]">{{ ev.label }}</span>
+              </li>
+              <li v-if="!issue.archive.timeline?.length" class="text-xs text-[#8b949e]">
+                Belum ada jejak penanganan.
               </li>
             </ol>
           </article>
@@ -246,26 +344,55 @@ watch(
         <h2 class="mb-3 font-display text-xl text-banten-navy">Konten</h2>
         <div
           v-if="!contents.length"
-          class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-10 text-center text-sm text-banten-navy/60"
+          class="rounded-2xl border border-dashed border-[#30363d] bg-[#161b22]/60 px-6 py-12 text-center text-sm text-[#8b949e]"
         >
           Tidak ada konten yang cocok.
         </div>
-        <div v-else class="space-y-2">
+        <div v-else class="space-y-3">
           <RouterLink
             v-for="c in contents"
             :key="c.id"
             :to="`/konten/${c.id}`"
-            class="block rounded-xl border border-banten-navy/10 bg-white/80 px-5 py-4 transition hover:border-banten-gold/40"
+            class="group relative block overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] transition duration-200 hover:-translate-y-0.5 hover:border-emerald-500/35"
           >
-            <div class="flex flex-wrap items-center gap-2 text-xs">
-              <span class="rounded bg-banten-sand px-2 py-0.5 text-banten-navy">{{ c.status }}</span>
-              <span class="text-banten-navy/45">{{ c.content_type }}</span>
+            <div
+              class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent"
+              :class="contentType(c).accent"
+              aria-hidden="true"
+            />
+            <div class="px-5 py-4 pl-6">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold leading-snug text-white transition group-hover:text-emerald-300">
+                  {{ c.title }}
+                </h3>
+                <span
+                  class="shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                  :class="contentStatus(c).chip"
+                >
+                  {{ contentStatus(c).label }}
+                </span>
+              </div>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-[#c9d1d9]">
+                  {{ contentType(c).label }}
+                </span>
+                <RiskBadge v-if="c.issue_risk_level" :level="c.issue_risk_level" show-label tone="outline" />
+                <span v-if="c.updated_at || c.created_at" class="text-[11px] text-[#6e7681]">
+                  {{ formatDateTime(c.updated_at || c.created_at) }}
+                </span>
+              </div>
+              <p class="mt-2 line-clamp-2 text-sm leading-relaxed text-[#8b949e]">
+                {{ excerpt(c.body) }}
+              </p>
+              <p class="mt-1 truncate text-xs text-[#6e7681]">
+                Isu: {{ c.issue_title || `#${c.issue_id}` }}
+              </p>
             </div>
-            <p class="mt-2 font-display text-lg text-banten-navy">{{ c.title }}</p>
-            <p class="mt-1 text-xs text-banten-navy/55">
-              Isu: {{ c.issue_title || `#${c.issue_id}` }}
-              <RiskBadge v-if="c.issue_risk_level" :level="c.issue_risk_level" class="ml-1.5 align-middle" />
-            </p>
+            <div class="flex items-center justify-end border-t border-[#30363d]/80 px-5 py-2.5 pl-6">
+              <span class="text-[11px] font-medium text-[#6e7681] transition group-hover:text-emerald-400">
+                Buka naskah
+              </span>
+            </div>
           </RouterLink>
         </div>
         <PaginationBar :meta="meta.contents" @update:page="onContentsPage" />

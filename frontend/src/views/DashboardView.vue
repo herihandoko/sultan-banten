@@ -12,30 +12,24 @@ import {
   PointElement,
   Tooltip,
 } from 'chart.js'
+import PageLoader from '../components/PageLoader.vue'
 import api from '../services/api'
-import { useProjectStore } from '../stores/project'
+import { usePeriodStore } from '../stores/period'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler)
 
-const projectStore = useProjectStore()
+const periodStore = usePeriodStore()
 const data = ref(null)
 const loading = ref(true)
+const reveal = ref(false)
 const error = ref('')
-
-const brand = {
-  navy: '#1B3A5C',
-  gold: '#D4A017',
-  red: '#C0392B',
-  green: '#2E7D4F',
-}
 
 async function load() {
   loading.value = true
+  reveal.value = false
   error.value = ''
   try {
-    const params = {}
-    if (projectStore.selectedId) params.project_id = projectStore.selectedId
-    const res = await api.get('/dashboard', { params })
+    const res = await api.get('/dashboard', { params: { days: periodStore.days } })
     data.value = res.data.data
   } catch (err) {
     error.value = err.response?.data?.error || 'Gagal memuat dashboard'
@@ -45,6 +39,8 @@ async function load() {
 }
 
 const kpis = computed(() => data.value?.kpis || {})
+const home = computed(() => data.value?.home || null)
+const isMonitor = computed(() => home.value?.layout === 'monitor')
 
 const trendChart = computed(() => {
   const t = data.value?.trend_7d
@@ -55,8 +51,8 @@ const trendChart = computed(() => {
       {
         label: 'Positif',
         data: t.positif,
-        borderColor: brand.green,
-        backgroundColor: 'rgba(46, 125, 79, 0.08)',
+        borderColor: '#34d399',
+        backgroundColor: 'rgba(52, 211, 153, 0.12)',
         tension: 0.35,
         fill: false,
         pointRadius: 3,
@@ -66,8 +62,8 @@ const trendChart = computed(() => {
       {
         label: 'Negatif',
         data: t.negatif,
-        borderColor: brand.red,
-        backgroundColor: 'rgba(192, 57, 43, 0.08)',
+        borderColor: '#fb7185',
+        backgroundColor: 'rgba(251, 113, 133, 0.12)',
         tension: 0.35,
         fill: false,
         pointRadius: 3,
@@ -78,35 +74,44 @@ const trendChart = computed(() => {
   }
 })
 
-const trendOptions = {
+const trendOptions = computed(() => {
+  const trend = data.value?.trend_7d
+  const values = [...(trend?.positif || []), ...(trend?.negatif || [])]
+  const max = values.length ? Math.max(...values) : 0
+  return {
   responsive: true,
   maintainAspectRatio: false,
   interaction: { mode: 'index', intersect: false },
   plugins: {
     legend: {
       position: 'bottom',
-      labels: { boxWidth: 10, usePointStyle: true, pointStyle: 'circle', font: { size: 12 } },
+      labels: { boxWidth: 10, usePointStyle: true, pointStyle: 'circle', color: '#c9d1d9', font: { size: 12 } },
     },
   },
   scales: {
     x: {
       grid: { display: false },
-      ticks: { color: '#64748b', font: { size: 11 } },
+      ticks: { color: '#8b949e', font: { size: 11 }, maxTicksLimit: 8, autoSkip: true },
     },
     y: {
       beginAtZero: true,
-      suggestedMax: 80,
-      grid: { color: 'rgba(27, 58, 92, 0.06)' },
-      ticks: { color: '#94a3b8', font: { size: 11 } },
+      ...(max === 0 ? { suggestedMax: 4 } : {}),
+      grid: { color: 'rgba(48, 54, 61, 0.9)' },
+      ticks: { color: '#8b949e', font: { size: 11 }, precision: 0 },
       border: { display: false },
     },
   },
 }
+})
 
-const severityBar = {
-  tinggi: 'bg-banten-red',
-  sedang: 'bg-amber-400',
-  rendah: 'bg-sky-400',
+const SEVERITY = {
+  tinggi: { label: 'Tinggi', accent: 'from-rose-500/90', chip: 'border-rose-500/40 bg-rose-500/10 text-rose-300' },
+  sedang: { label: 'Sedang', accent: 'from-amber-400/90', chip: 'border-amber-500/40 bg-amber-500/10 text-amber-300' },
+  rendah: { label: 'Rendah', accent: 'from-sky-400/90', chip: 'border-sky-500/40 bg-sky-500/10 text-sky-300' },
+}
+
+function severityOf(level) {
+  return SEVERITY[level] || { label: level || '—', accent: 'from-slate-400/80', chip: 'border-[#30363d] text-[#c9d1d9]' }
 }
 
 function formatMention(n) {
@@ -124,7 +129,7 @@ function formatReach(n) {
 }
 
 watch(
-  () => projectStore.selectedId,
+  () => periodStore.days,
   () => {
     load()
   },
@@ -137,136 +142,159 @@ onMounted(load)
   <div>
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-display text-3xl text-banten-navy">Dashboard SIAGAPIM BANTEN</h1>
-        <p class="mt-1 text-sm text-banten-navy/65">
-          Media monitoring isu aktual yang menyangkut pimpinan — pantauan harian
-          <span v-if="projectStore.selectedProject" class="font-medium text-banten-navy">
-            · {{ projectStore.selectedProject.name }}
-          </span>
+        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/80">
+          {{ home?.eyebrow || 'Beranda' }}
+        </p>
+        <h1 class="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+          {{ home?.title || 'Dashboard SIAGAPIM' }}
+        </h1>
+        <p class="mt-1 text-sm text-[#8b949e]">
+          {{ home?.subtitle || 'Pantauan mention, sentimen, dan isu aktif' }}
         </p>
       </div>
       <div class="flex items-center gap-2">
         <span
           v-if="data?.source === 'sipantau_stub'"
-          class="rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200/80"
+          class="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-300"
         >
-          SIPANTAU offline · KPI fallback
+          SIPANTAU offline
         </span>
         <span
           v-else-if="data?.source === 'sipantau'"
-          class="rounded-md bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-800 ring-1 ring-emerald-200/80"
+          class="rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] font-semibold text-emerald-300"
         >
           Live · SIPANTAU
         </span>
         <span
           v-else-if="data?.source === 'mata_bathin_stub'"
-          class="rounded-md bg-amber-50 px-2.5 py-1 text-[11px] font-medium text-amber-800 ring-1 ring-amber-200/80"
+          class="rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-[11px] font-semibold text-amber-300"
         >
-          Data demo · stub Mata Bathin
+          Data demo
         </span>
         <button
           type="button"
-          class="rounded-md border border-banten-navy/20 px-3 py-1.5 text-xs text-banten-navy hover:bg-white"
+          class="rounded-xl border border-[#30363d] bg-[#161b22] px-3 py-1.5 text-xs font-semibold text-[#c9d1d9] hover:border-emerald-500/40 hover:text-white"
           @click="load"
         >
-          Refresh
+          Muat ulang
         </button>
       </div>
     </div>
 
-    <div v-if="loading" class="text-sm text-banten-navy/60">Memuat dashboard...</div>
+    <PageLoader v-if="!reveal" title="Memuat dashboard" :done="!loading" @finished="reveal = true" />
     <div v-else-if="error" class="rounded-md border border-banten-red/30 bg-red-50 px-4 py-3 text-sm text-banten-red">
       {{ error }}
     </div>
 
     <template v-else-if="data">
-      <!-- KPI row -->
-      <section class="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        <div class="rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-banten-navy/5">
-          <p class="text-sm text-slate-500">Total mention</p>
-          <p class="mt-2 font-display text-3xl tracking-tight text-slate-900">
-            {{ formatMention(kpis.total_mention) }}
-          </p>
-        </div>
-        <div class="rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-banten-navy/5">
-          <p class="text-sm text-slate-500">Sentimen negatif</p>
-          <p class="mt-2 font-display text-3xl tracking-tight text-banten-red">
-            {{ kpis.sentiment_negative_pct }}%
-          </p>
-        </div>
-        <div class="rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-banten-navy/5">
-          <p class="text-sm text-slate-500">Reach</p>
-          <p class="mt-2 font-display text-3xl tracking-tight text-slate-900">
-            {{ formatReach(kpis.reach) }}
-          </p>
-        </div>
-        <div class="rounded-2xl bg-white px-5 py-4 shadow-sm ring-1 ring-banten-navy/5">
-          <p class="text-sm text-slate-500">Isu aktif</p>
-          <p class="mt-2 font-display text-3xl tracking-tight text-slate-900">
-            {{ kpis.active_issues }}
-          </p>
-        </div>
+      <template v-if="isMonitor">
+      <section class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <article class="rounded-2xl border border-[#30363d] bg-[#161b22] px-5 py-4">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Total mention</p>
+          <p class="mt-2 text-3xl font-semibold tracking-tight text-white">{{ formatMention(kpis.total_mention) }}</p>
+          <p class="mt-1 text-xs text-[#6e7681]">Percakapan yang tertangkap</p>
+        </article>
+        <article class="rounded-2xl border border-[#30363d] bg-[#161b22] px-5 py-4">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Sentimen negatif</p>
+          <p class="mt-2 text-3xl font-semibold tracking-tight text-rose-300">{{ kpis.sentiment_negative_pct }}%</p>
+          <p class="mt-1 text-xs text-[#6e7681]">Porsi pembicaraan yang kurang baik</p>
+        </article>
+        <article class="rounded-2xl border border-[#30363d] bg-[#161b22] px-5 py-4">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Jangkauan</p>
+          <p class="mt-2 text-3xl font-semibold tracking-tight text-white">{{ formatReach(kpis.reach) }}</p>
+          <p class="mt-1 text-xs text-[#6e7681]">Perkiraan orang yang terpapar</p>
+        </article>
+        <article class="rounded-2xl border border-[#30363d] bg-[#161b22] px-5 py-4">
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Isu aktif</p>
+          <p class="mt-2 text-3xl font-semibold tracking-tight text-white">{{ kpis.active_issues }}</p>
+          <p class="mt-1 text-xs text-[#6e7681]">Masih terbuka pada {{ periodStore.label.toLowerCase() }}</p>
+        </article>
       </section>
 
-      <!-- Trend + Alerts -->
-      <section class="mb-5 grid gap-4 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,22rem)]">
-        <div class="min-w-0 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-banten-navy/5">
-          <h2 class="text-base font-semibold text-slate-800">
-            Tren volume &amp; sentimen mention (7 hari)
-          </h2>
+      <section class="mb-4 grid items-stretch gap-4 lg:grid-cols-5">
+        <div class="min-w-0 rounded-2xl border border-[#30363d] bg-[#161b22] p-5 lg:col-span-3">
+          <h2 class="text-base font-semibold text-white">Tren mention · {{ periodStore.label }}</h2>
+          <p class="mt-1 text-xs text-[#8b949e]">Garis hijau untuk sentimen positif, garis merah untuk negatif.</p>
           <div class="mt-4 h-64">
             <Line v-if="trendChart" :data="trendChart" :options="trendOptions" />
           </div>
         </div>
 
-        <div class="flex min-w-0 flex-col overflow-hidden rounded-2xl bg-white p-5 shadow-sm ring-1 ring-banten-navy/5">
+        <div class="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] p-5 lg:col-span-2">
           <div class="flex shrink-0 items-center justify-between gap-2">
-            <h2 class="text-base font-semibold text-slate-800">Alert isu aktif</h2>
-            <RouterLink to="/crisis-room" class="shrink-0 text-xs text-banten-gold hover:underline">
-              Crisis Room →
+            <div>
+              <h2 class="text-base font-semibold text-white">Isu yang perlu perhatian</h2>
+              <p class="mt-1 text-xs text-[#8b949e]">Enam isu aktif pada {{ periodStore.label.toLowerCase() }}</p>
+            </div>
+            <RouterLink to="/crisis-room" class="shrink-0 text-xs font-semibold text-emerald-300 hover:text-emerald-200">
+              Crisis Room
             </RouterLink>
           </div>
-          <ul class="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto">
+          <ul class="mt-4 max-h-64 min-h-0 flex-1 space-y-2 overflow-y-auto">
             <li v-for="(alert, idx) in data.alerts" :key="alert.id || idx" class="min-w-0">
               <component
                 :is="alert.id ? RouterLink : 'div'"
                 :to="alert.id ? `/issues/${alert.id}` : undefined"
-                class="flex min-w-0 gap-3 rounded-xl bg-slate-50/80 px-3 py-3 transition"
-                :class="alert.id ? 'hover:bg-slate-100' : ''"
+                class="relative flex min-w-0 gap-3 overflow-hidden rounded-xl border border-[#30363d] bg-[#0d1117] px-3 py-3 pl-4 transition"
+                :class="alert.id ? 'hover:border-emerald-500/35' : ''"
               >
-                <span
-                  class="mt-0.5 w-1 shrink-0 self-stretch rounded-full"
-                  :class="severityBar[alert.severity] || 'bg-slate-300'"
-                />
+                <span class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent" :class="severityOf(alert.severity).accent" />
                 <div class="min-w-0 flex-1 overflow-hidden">
-                  <p class="line-clamp-2 text-sm font-medium leading-snug text-slate-800">
-                    {{ alert.title }}
-                  </p>
-                  <p class="mt-1 text-xs text-slate-500">
-                    Severity {{ alert.severity }} · {{ alert.ago }}
-                  </p>
+                  <p class="line-clamp-2 text-sm font-semibold leading-snug text-white">{{ alert.title }}</p>
+                  <div class="mt-2 flex flex-wrap items-center gap-2">
+                    <span class="rounded-md border px-2 py-0.5 text-[10px] font-semibold" :class="severityOf(alert.severity).chip">
+                      {{ severityOf(alert.severity).label }}
+                    </span>
+                    <span v-if="alert.risk_level" class="text-[11px] text-[#8b949e]">{{ alert.risk_level }}</span>
+                    <span class="text-[11px] text-[#6e7681]">{{ alert.ago }}</span>
+                  </div>
                 </div>
               </component>
             </li>
-            <li v-if="!(data.alerts || []).length" class="text-sm text-slate-500">
-              Tidak ada isu aktif untuk project ini.
+            <li v-if="!(data.alerts || []).length" class="rounded-xl border border-dashed border-[#30363d] px-4 py-8 text-center text-sm text-[#8b949e]">
+              Tidak ada isu aktif pada periode ini.
             </li>
           </ul>
         </div>
       </section>
 
-      <!-- Platforms -->
-      <section class="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-banten-navy/5">
-        <h2 class="text-base font-semibold text-slate-800">Sebaran isu per platform</h2>
-        <div class="mt-5 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section v-if="home" class="mb-4 rounded-2xl border border-[#30363d] bg-[#161b22] p-5">
+        <h2 class="text-base font-semibold text-white">{{ home.tasks_title }}</h2>
+        <div class="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div
+            v-for="card in home.cards"
+            :key="card.label"
+            class="rounded-xl border border-[#30363d] bg-[#0d1117] px-4 py-3"
+          >
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">{{ card.label }}</p>
+            <p class="mt-1 text-2xl font-semibold text-white">{{ card.value }}</p>
+            <p class="mt-1 text-xs text-[#6e7681]">{{ card.hint }}</p>
+          </div>
+        </div>
+        <ul v-if="home.tasks?.length" class="mt-4 space-y-2">
+          <li v-for="(task, idx) in home.tasks" :key="idx">
+            <RouterLink
+              :to="task.href"
+              class="flex items-center justify-between gap-4 rounded-xl border border-[#30363d] bg-[#0d1117] px-4 py-3 transition hover:border-emerald-500/35"
+            >
+              <span class="min-w-0 text-sm font-semibold leading-snug text-white">{{ task.title }}</span>
+              <span class="shrink-0 text-right text-[11px] text-[#8b949e]">{{ task.meta }}</span>
+            </RouterLink>
+          </li>
+        </ul>
+        <p v-else class="mt-4 text-sm text-[#8b949e]">{{ home.tasks_empty }}</p>
+      </section>
+
+      <section class="rounded-2xl border border-[#30363d] bg-[#161b22] p-5">
+        <h2 class="text-base font-semibold text-white">Sebaran per kanal</h2>
+        <p class="mt-1 text-xs text-[#8b949e]">Jumlah mention pada {{ periodStore.label.toLowerCase() }}.</p>
+        <div class="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <div
             v-for="p in data.platforms"
             :key="p.key"
-            class="flex items-center gap-4 rounded-xl border border-slate-100 bg-slate-50/50 px-4 py-4"
+            class="flex items-center gap-4 rounded-xl border border-[#30363d] bg-[#0d1117] px-4 py-4"
           >
-            <span
-              class="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-white text-banten-navy shadow-sm ring-1 ring-slate-100"
-            >
+            <span class="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-[#30363d] bg-[#161b22] text-[#c9d1d9]">
               <!-- twitter/X -->
               <svg v-if="p.key === 'twitter'" class="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.727-8.835L1.254 2.25H8.08l4.253 5.622L18.244 2.25Zm-1.161 17.52h1.833L7.084 4.126H5.117L17.083 19.77Z" />
@@ -289,8 +317,53 @@ onMounted(load)
               </svg>
             </span>
             <div>
-              <p class="text-sm text-slate-500">{{ p.label }}</p>
-              <p class="font-display text-2xl text-slate-900">{{ formatMention(p.count) }}</p>
+              <p class="text-sm text-[#8b949e]">{{ p.label }}</p>
+              <p class="text-2xl font-semibold text-white">{{ formatMention(p.count) }}</p>
+            </div>
+          </div>
+        </div>
+      </section>
+      </template>
+
+      <section v-else-if="home" class="space-y-4">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <article
+            v-for="card in home.cards"
+            :key="card.label"
+            class="rounded-2xl border border-[#30363d] bg-[#161b22] px-5 py-4"
+          >
+            <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">{{ card.label }}</p>
+            <p class="mt-2 text-3xl font-semibold tracking-tight text-white">{{ card.value }}</p>
+            <p class="mt-1 text-xs text-[#6e7681]">{{ card.hint }}</p>
+          </article>
+        </div>
+        <div class="grid gap-4" :class="home.links?.length ? 'lg:grid-cols-[minmax(0,1fr)_16rem]' : ''">
+          <div class="rounded-2xl border border-[#30363d] bg-[#161b22] p-5">
+            <h2 class="text-base font-semibold text-white">{{ home.tasks_title }}</h2>
+            <ul v-if="home.tasks?.length" class="mt-3 space-y-2">
+              <li v-for="(task, idx) in home.tasks" :key="idx">
+                <RouterLink
+                  :to="task.href"
+                  class="flex items-start justify-between gap-3 rounded-xl border border-[#30363d] bg-[#0d1117] px-4 py-3 transition hover:border-emerald-500/35"
+                >
+                  <span class="text-sm font-semibold leading-snug text-white">{{ task.title }}</span>
+                  <span class="shrink-0 text-[11px] text-[#8b949e]">{{ task.meta }}</span>
+                </RouterLink>
+              </li>
+            </ul>
+            <p v-else class="mt-3 text-sm text-[#8b949e]">{{ home.tasks_empty }}</p>
+          </div>
+          <div v-if="home.links?.length" class="rounded-2xl border border-[#30363d] bg-[#161b22] p-5">
+            <h2 class="text-base font-semibold text-white">Lanjut ke</h2>
+            <div class="mt-3 flex flex-col gap-2">
+              <RouterLink
+                v-for="link in home.links"
+                :key="link.href"
+                :to="link.href"
+                class="rounded-xl border border-[#30363d] bg-[#0d1117] px-4 py-3 text-sm font-semibold text-emerald-300 transition hover:border-emerald-500/35"
+              >
+                {{ link.label }}
+              </RouterLink>
             </div>
           </div>
         </div>

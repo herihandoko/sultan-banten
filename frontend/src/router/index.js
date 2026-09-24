@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
+import { useNewsSourceStore } from '../stores/newsSource'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -92,13 +93,29 @@ const router = createRouter({
           component: () => import('../views/OpdMasterView.vue'),
           meta: { roles: ['super_admin'] },
         },
+        {
+          path: 'settings',
+          name: 'settings',
+          component: () => import('../views/SettingsView.vue'),
+          meta: { roles: ['super_admin', 'editor'] },
+        },
+        {
+          path: 'proses-bisnis',
+          name: 'proses-bisnis',
+          component: () => import('../views/BusinessProcessView.vue'),
+        },
+        {
+          path: 'panduan',
+          name: 'panduan',
+          component: () => import('../views/UserManualView.vue'),
+        },
       ],
     },
   ],
 })
 
 function defaultHome(role) {
-  if (role === 'asn') return { name: 'missions' }
+  if (role === 'asn') return { name: 'dashboard' }
   if (role === 'opd_admin') return { name: 'validasi-opd' }
   if (role === 'pimpinan') return { name: 'dashboard' }
   return { name: 'dashboard' }
@@ -114,14 +131,17 @@ router.beforeEach(async (to) => {
   if (needsAuth && !auth.isAuthenticated) {
     return { name: 'login' }
   }
+  if (auth.isAuthenticated) {
+    const newsSource = useNewsSourceStore()
+    if (!newsSource.loaded) {
+      await newsSource.load()
+    }
+  }
   if (isGuest && auth.isAuthenticated) {
     return defaultHome(auth.user?.role?.code)
   }
-  if (
-    (to.name === 'dashboard' || to.name === 'crisis-room')
-    && auth.user?.role?.code === 'asn'
-  ) {
-    return { name: 'missions' }
+  if (to.name === 'crisis-room' && auth.user?.role?.code === 'asn') {
+    return { name: 'dashboard' }
   }
   const allowed = to.meta.roles
   if (allowed?.length && !allowed.includes(auth.user?.role?.code)) {

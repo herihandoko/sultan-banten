@@ -1,21 +1,40 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { RouterLink, RouterView, useRoute } from 'vue-router'
 import { useLocalStorage } from '@vueuse/core'
 import { APP_NAME, APP_FULL_NAME, APP_VERSION_LABEL } from '../config/app'
 import { useAuthStore } from '../stores/auth'
+import { useNewsSourceStore } from '../stores/newsSource'
 import { useThemeStore } from '../stores/theme'
 import AlertBell from '../components/AlertBell.vue'
 import AppSwitcher from '../components/AppSwitcher.vue'
-import ProjectSwitcher from '../components/ProjectSwitcher.vue'
-import { useProjectStore } from '../stores/project'
+import LiveClock from '../components/LiveClock.vue'
+import PeriodSwitcher from '../components/PeriodSwitcher.vue'
+import UserMenu from '../components/UserMenu.vue'
+import { useValidationBadgeStore } from '../stores/validationBadge'
 
 const auth = useAuthStore()
 const theme = useThemeStore()
-const projectStore = useProjectStore()
+const newsSource = useNewsSourceStore()
+const validationBadge = useValidationBadgeStore()
 const route = useRoute()
 const collapsed = useLocalStorage('sb-sidebar-collapsed', false)
 const mobileOpen = ref(false)
+
+const showsValidationMenu = computed(() =>
+  navGroups.value.some((group) => group.items.some((item) => item.match === 'validasi-opd')),
+)
+
+function refreshValidationBadge() {
+  if (showsValidationMenu.value) validationBadge.refresh()
+}
+
+onMounted(() => {
+  if (!newsSource.loaded) newsSource.load()
+  refreshValidationBadge()
+})
+
+watch(() => route.fullPath, refreshValidationBadge)
 
 const navGroups = computed(() => {
   const role = auth.user?.role?.code
@@ -44,7 +63,7 @@ const navGroups = computed(() => {
         { to: '/media-hub', label: 'Media Hub', match: 'media-hub', icon: 'newspaper' },
         { to: '/agenda', label: 'Agenda', match: 'agenda', icon: 'calendar' },
         { to: '/missions', label: 'Mission Board', match: 'missions', icon: 'flag' },
-        { to: '/kol', label: 'KOL', match: 'kol', icon: 'megaphone' },
+        { to: '/kol', label: 'Influencer', match: 'kol', icon: 'megaphone' },
       ],
     },
     {
@@ -56,9 +75,18 @@ const navGroups = computed(() => {
       ],
     },
     {
+      key: 'panduan',
+      label: 'Panduan',
+      items: [
+        { to: '/proses-bisnis', label: 'Proses Bisnis', match: 'proses-bisnis', icon: 'flow' },
+        { to: '/panduan', label: 'Tutorial', match: 'panduan', icon: 'book' },
+      ],
+    },
+    {
       key: 'sistem',
       label: 'Administrasi',
       items: [
+        { to: '/settings', label: 'Pengaturan', match: 'settings', icon: 'cog' },
         { to: '/opds', label: 'Master OPD', match: 'opds', icon: 'clipboard' },
         { to: '/users', label: 'Users', match: 'users', icon: 'users' },
       ],
@@ -67,9 +95,9 @@ const navGroups = computed(() => {
 
   let allowed = null
   if (role === 'opd_admin') {
-    allowed = ['dashboard', 'validasi-opd', 'crisis-room']
+    allowed = ['dashboard', 'validasi-opd', 'crisis-room', 'proses-bisnis', 'panduan']
   } else if (role === 'asn') {
-    allowed = ['missions']
+    allowed = ['dashboard', 'missions', 'proses-bisnis', 'panduan']
   } else if (role === 'pimpinan') {
     allowed = [
       'dashboard',
@@ -82,9 +110,11 @@ const navGroups = computed(() => {
       'arsip',
       'executive',
       'reports',
+      'proses-bisnis',
+      'panduan',
     ]
   } else if (role === 'media_kol_admin') {
-    allowed = ['dashboard', 'media-hub', 'agenda', 'kol', 'arsip', 'reports']
+    allowed = ['dashboard', 'media-hub', 'agenda', 'kol', 'arsip', 'reports', 'proses-bisnis', 'panduan']
   } else if (role === 'editor') {
     allowed = [
       'dashboard',
@@ -96,6 +126,9 @@ const navGroups = computed(() => {
       'missions',
       'arsip',
       'reports',
+      'settings',
+      'proses-bisnis',
+      'panduan',
     ]
   }
 
@@ -107,11 +140,6 @@ const navGroups = computed(() => {
     .filter((g) => g.items.length > 0)
 })
 
-const roleName = computed(() => auth.user?.role?.name || '—')
-const userInitial = computed(() => {
-  const name = auth.user?.full_name || auth.user?.username || 'U'
-  return name.trim().charAt(0).toUpperCase()
-})
 const showAlerts = computed(() =>
   ['super_admin', 'editor', 'pimpinan', 'media_kol_admin'].includes(auth.user?.role?.code),
 )
@@ -126,12 +154,6 @@ function isActive(item) {
 
 function toggleSidebar() {
   collapsed.value = !collapsed.value
-}
-
-async function onLogout() {
-  await auth.logout()
-  // Hard navigate — avoids stuck SPA transitions from the authed layout
-  window.location.assign('/login')
 }
 
 watch(
@@ -180,10 +202,17 @@ watch(
               <img src="/pavicon.png" :alt="APP_NAME" class="h-7 w-7 object-contain" />
             </div>
             <div class="min-w-0 flex-col" :class="collapsed ? 'lg:hidden' : 'flex'">
-              <span class="text-lg font-black uppercase leading-none tracking-tight text-white">
-                SIA<span class="text-emerald-400">GAPIM</span>
-              </span>
-              <span class="mt-1 text-[9px] font-semibold uppercase tracking-wider text-[#8b949e]">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="text-lg font-black uppercase leading-none tracking-tight text-white whitespace-nowrap">
+                  SIAGAPIM
+                </span>
+                <span
+                  class="inline-flex items-center rounded-md border border-emerald-500/40 bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold uppercase leading-none tracking-wide text-emerald-400"
+                >
+                  Banten
+                </span>
+              </div>
+              <span class="mt-1.5 text-[9px] font-semibold uppercase tracking-wider text-[#8b949e]">
                 Respons &amp; Media Adpim
               </span>
             </div>
@@ -283,16 +312,36 @@ watch(
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16 19v-1a3 3 0 0 0-3-3H7a3 3 0 0 0-3 3v1" />
                 <path stroke-linecap="round" stroke-linejoin="round" d="M10 12a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" />
               </svg>
+              <svg v-else-if="item.icon === 'flow'" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M7 7h4v4H7V7Zm6 6h4v4h-4v-4Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M11 9h2a2 2 0 0 1 2 2v2" />
+              </svg>
+              <svg v-else-if="item.icon === 'book'" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.5C10.5 5.2 8.4 4.5 6 4.5v13c2.4 0 4.5.7 6 2 1.5-1.3 3.6-2 6-2v-13c-2.4 0-4.5.7-6 2Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.5v13" />
+              </svg>
+              <svg v-else-if="item.icon === 'cog'" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065Z" />
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
+              </svg>
             </span>
             <span class="truncate" :class="collapsed ? 'lg:sr-only' : ''">
               {{ item.label }}
+            </span>
+            <span
+              v-if="item.match === 'validasi-opd' && validationBadge.waiting > 0"
+              class="inline-flex min-w-5 items-center justify-center rounded-full border border-amber-400/40 bg-amber-400/15 px-1.5 py-0.5 text-[10px] font-bold leading-none tabular-nums text-amber-300"
+              :class="collapsed ? 'lg:absolute lg:top-0.5 lg:right-0.5 lg:min-w-4 lg:px-1' : 'ml-auto'"
+              :title="`${validationBadge.waiting} menunggu`"
+            >
+              {{ validationBadge.waiting > 99 ? '99+' : validationBadge.waiting }}
             </span>
             <span
               v-if="collapsed"
               class="pointer-events-none absolute top-1/2 left-full z-50 ml-3 hidden -translate-y-1/2 whitespace-nowrap rounded-md border border-[#30363d] bg-[#21262d] px-2.5 py-1.5 text-xs font-medium text-white shadow-lg lg:group-hover:block"
               role="tooltip"
             >
-              {{ item.label }}
+              {{ item.label }}<template v-if="item.match === 'validasi-opd' && validationBadge.waiting > 0"> · {{ validationBadge.waiting }} menunggu</template>
             </span>
           </RouterLink>
         </div>
@@ -324,17 +373,11 @@ watch(
             </svg>
           </button>
           <AppSwitcher />
-
-          <div class="hidden min-w-0 sm:block">
-            <p class="truncate text-xs text-[#8b949e]">
-              {{ auth.user?.full_name }}
-              <span class="text-[#6e7681]">· {{ roleName }}</span>
-            </p>
-          </div>
         </div>
 
         <div class="flex shrink-0 items-center gap-2.5">
-          <ProjectSwitcher />
+          <PeriodSwitcher />
+          <LiveClock />
           <button
             type="button"
             class="inline-flex items-center justify-center rounded-lg border border-[#30363d] bg-[#161b22] p-2 text-[#c9d1d9] transition hover:bg-[#21262d] hover:text-white"
@@ -342,7 +385,6 @@ watch(
             :aria-label="theme.isDark ? 'Aktifkan mode terang' : 'Aktifkan mode gelap'"
             @click="theme.toggle()"
           >
-            <!-- sun -->
             <svg
               v-if="theme.isDark"
               class="h-4 w-4"
@@ -350,6 +392,7 @@ watch(
               viewBox="0 0 24 24"
               stroke="currentColor"
               stroke-width="1.75"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
@@ -357,7 +400,6 @@ watch(
                 d="M12 3v2.25M12 18.75V21M4.5 12H2.25M21.75 12H19.5M6.34 6.34 4.76 4.76M19.24 19.24l-1.58-1.58M6.34 17.66l-1.58 1.58M19.24 4.76l-1.58 1.58M16.5 12a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0Z"
               />
             </svg>
-            <!-- moon -->
             <svg
               v-else
               class="h-4 w-4"
@@ -365,6 +407,7 @@ watch(
               viewBox="0 0 24 24"
               stroke="currentColor"
               stroke-width="1.75"
+              aria-hidden="true"
             >
               <path
                 stroke-linecap="round"
@@ -374,19 +417,7 @@ watch(
             </svg>
           </button>
           <AlertBell v-if="showAlerts" />
-          <button
-            type="button"
-            class="rounded-lg border border-[#30363d] bg-[#161b22] px-3 py-1.5 text-xs font-semibold text-[#c9d1d9] transition hover:border-rose-500/40 hover:text-rose-400"
-            @click="onLogout"
-          >
-            Keluar
-          </button>
-          <div
-            class="flex h-8 w-8 items-center justify-center rounded-full border border-[#30363d] bg-[#21262d] text-xs font-bold text-white"
-            :title="auth.user?.full_name"
-          >
-            {{ userInitial }}
-          </div>
+          <UserMenu />
         </div>
       </header>
 
@@ -394,7 +425,7 @@ watch(
         class="min-h-0 flex-1 overflow-y-auto p-4 transition-colors sm:p-6"
         :class="theme.isDark ? 'bg-[#0d1117] text-[#c9d1d9]' : 'bg-[#f0f3f7] text-banten-navy'"
       >
-        <RouterView :key="projectStore.selectedId || 'no-project'" />
+        <RouterView />
       </main>
       <footer class="shrink-0 border-t border-[#30363d] bg-[#0d1117] px-4 py-2.5 text-center text-[11px] text-[#8b949e] sm:px-6 sm:text-left">
         {{ APP_NAME }} · {{ APP_VERSION_LABEL }}

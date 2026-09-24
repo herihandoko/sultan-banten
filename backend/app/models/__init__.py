@@ -9,6 +9,7 @@ from app.models.report import Report, AuditLog
 from app.models.alert import CrisisAlert
 from app.models.agenda import EditorialAgenda
 from app.models.opd import Opd
+from app.models.setting import AppSetting
 
 __all__ = [
     "User",
@@ -30,4 +31,5 @@ __all__ = [
     "CrisisAlert",
     "EditorialAgenda",
     "Opd",
+    "AppSetting",
 ]

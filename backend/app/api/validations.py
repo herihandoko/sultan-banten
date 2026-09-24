@@ -14,6 +14,18 @@ from app.utils.project_scope import filter_query_by_issue_ids, request_project_i
 bp = Blueprint("validations", __name__)
 
 
+def _scoped_validation_query(user):
+    """Daftar validasi sesuai peran dan project yang sedang dipilih."""
+    query = OpdValidation.query
+    query = filter_query_by_issue_ids(query, OpdValidation.issue_id, request_project_id())
+    if user and user.role and user.role.code == "opd_admin":
+        filters = [OpdValidation.assigned_to == user.id]
+        if user.opd_name:
+            filters.append(OpdValidation.opd_name == user.opd_name)
+        query = query.filter(db.or_(*filters))
+    return query
+
+
 def _validation_payload(item: OpdValidation, include_issue: bool = False) -> dict:
     data = item.to_dict()
     if include_issue and item.issue:
@@ -24,9 +36,99 @@ def _validation_payload(item: OpdValidation, include_issue: bool = False) -> dic
             "why_now": item.issue.why_now,
             "risk_level": item.issue.risk_level,
             "status": item.issue.status,
+            "source_label": item.issue.primary_source_label(),
+            "source_url": item.issue.primary_source_url(),
             "evidence": [e.to_dict() for e in item.issue.evidence],
         }
     return data
+
+
+def _validation_url(validation_id: int) -> str:
+    import os
+
+    configured = (os.getenv("PUBLIC_APP_URL") or "").strip().rstrip("/")
+    if configured:
+        base = configured
+    else:
+        proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "http").split(",")[0].strip()
+        host = (request.headers.get("X-Forwarded-Host") or request.host or "").split(",")[0].strip()
+        base = f"{proto}://{host}".rstrip("/")
+    return f"{base}/validasi-opd?id={validation_id}"
+
+
+def _opd_admins(opd_name: str) -> list[User]:
+    from app.models import Role
+
+    return (
+        User.query.join(Role)
+        .filter(
+            User.is_active.is_(True),
+            User.opd_name == opd_name,
+            Role.code == "opd_admin",
+        )
+        .all()
+    )
+
+
+def _notify_validation_request(issue, validation, requester, recipients: list[User]) -> list[dict]:
+    """Email + WhatsApp ke admin OPD. Kegagalan kirim tidak membatalkan permintaan."""
+    from app.services.messaging import send_email, send_whatsapp
+
+    people = [person for person in recipients if person]
+    who = (requester.full_name or requester.username) if requester else "SIAGAPIM"
+    notes = (validation.request_notes or "").strip() or "-"
+    link = _validation_url(validation.id)
+    subject = f"Permintaan validasi isu — {issue.title}"
+    body = (
+        "Permintaan validasi data dari SIAGAPIM.\n\n"
+        f"Isu: {issue.title}\n"
+        f"OPD: {validation.opd_name}\n"
+        f"Catatan: {notes}\n"
+        f"Diminta oleh: {who}\n\n"
+        "Buka permintaan validasi:\n"
+        f"{link}"
+    )
+
+    if not people:
+        return [
+            {
+                "channel": "whatsapp",
+                "status": "skipped",
+                "error": "Tidak ada admin OPD yang bisa dihubungi",
+            },
+            {
+                "channel": "email",
+                "status": "skipped",
+                "error": "Tidak ada admin OPD yang bisa dihubungi",
+            },
+        ]
+
+    results = []
+    for person in people:
+        name = person.full_name or person.username
+        if person.phone:
+            results.append(send_whatsapp(person.phone, body))
+        else:
+            results.append(
+                {
+                    "channel": "whatsapp",
+                    "to": name,
+                    "status": "skipped",
+                    "error": "Nomor WhatsApp admin kosong",
+                }
+            )
+        if person.email:
+            results.append(send_email(person.email, subject, body))
+        else:
+            results.append(
+                {
+                    "channel": "email",
+                    "to": name,
+                    "status": "skipped",
+                    "error": "Email admin kosong",
+                }
+            )
+    return results
 
 
 @bp.get("")
@@ -36,15 +138,7 @@ def list_validations():
     user = get_current_user()
     status = request.args.get("status")
     q = (request.args.get("q") or "").strip()
-    query = OpdValidation.query
-    query = filter_query_by_issue_ids(query, OpdValidation.issue_id, request_project_id())
-
-    # OPD admin only sees validations for their OPD (or assigned to them)
-    if user and user.role and user.role.code == "opd_admin":
-        filters = [OpdValidation.assigned_to == user.id]
-        if user.opd_name:
-            filters.append(OpdValidation.opd_name == user.opd_name)
-        query = query.filter(db.or_(*filters))
+    query = _scoped_validation_query(user)
 
     if status:
         query = query.filter_by(status=status)
@@ -60,6 +154,16 @@ def list_validations():
 
     query = query.order_by(OpdValidation.requested_at.desc())
     return jsonify(paginate(query, lambda i: _validation_payload(i, include_issue=True)))
+
+
+@bp.get("/summary")
+@jwt_required()
+@role_required("super_admin", "editor", "opd_admin", "pimpinan")
+def validation_summary():
+    """Jumlah permintaan yang masih menunggu, untuk badge menu."""
+    user = get_current_user()
+    waiting = _scoped_validation_query(user).filter_by(status="waiting").count()
+    return jsonify({"data": {"waiting": waiting}})
 
 
 @bp.get("/<int:validation_id>")
@@ -145,7 +249,13 @@ def request_validation(issue_id: int):
         )
     )
     db.session.commit()
-    return jsonify({"data": _validation_payload(validation, include_issue=True)}), 201
+
+    explicit_assignee = bool(data.get("assigned_to"))
+    targets = [assignee] if explicit_assignee and assignee else _opd_admins(opd_name)
+    delivery = _notify_validation_request(issue, validation, user, targets)
+    payload = _validation_payload(validation, include_issue=True)
+    payload["delivery"] = delivery
+    return jsonify({"data": payload}), 201
 
 
 @bp.patch("/<int:validation_id>/respond")

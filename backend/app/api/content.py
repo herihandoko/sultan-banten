@@ -54,7 +54,39 @@ def list_content():
             )
         )
     query = query.order_by(ContentItem.updated_at.desc())
-    return jsonify(paginate(query, lambda i: _content_payload(i, include_issue=True)))
+    payload = paginate(query, lambda i: _content_payload(i, include_issue=True))
+    payload["summary"] = _content_summary()
+    return jsonify(payload)
+
+
+def _content_summary():
+    """Hitungan pipeline konten di proyek aktif, lepas dari filter halaman."""
+
+    def scoped():
+        return filter_query_by_issue_ids(
+            ContentItem.query, ContentItem.issue_id, request_project_id()
+        )
+
+    by_status = {row[0]: row[1] for row in scoped().with_entities(ContentItem.status, db.func.count()).group_by(ContentItem.status)}
+    by_type = {
+        row[0]: row[1]
+        for row in scoped().with_entities(ContentItem.content_type, db.func.count()).group_by(ContentItem.content_type)
+    }
+    return {
+        "total": sum(by_status.values()),
+        "by_status": {
+            "draft": by_status.get("draft", 0),
+            "in_review": by_status.get("in_review", 0),
+            "approved": by_status.get("approved", 0),
+            "rejected": by_status.get("rejected", 0),
+            "published": by_status.get("published", 0),
+        },
+        "by_type": {
+            "text_release": by_type.get("text_release", 0),
+            "infographic": by_type.get("infographic", 0),
+            "video": by_type.get("video", 0),
+        },
+    }
 
 
 @bp.get("/issues-ready")

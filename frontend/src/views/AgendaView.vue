@@ -39,12 +39,18 @@ const canManage = computed(() =>
   ['super_admin', 'editor', 'media_kol_admin'].includes(auth.user?.role?.code),
 )
 
-const statusColor = {
-  planned: 'bg-slate-200 text-slate-700',
-  in_production: 'bg-amber-100 text-amber-800',
-  ready: 'bg-sky-100 text-sky-800',
-  published: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-red-100 text-red-800',
+const STATUS_META = {
+  planned: { label: 'Direncanakan', chip: 'border-slate-500/40 bg-slate-500/10 text-slate-300', accent: 'from-slate-400/80' },
+  in_production: { label: 'Produksi', chip: 'border-amber-500/40 bg-amber-500/10 text-amber-300', accent: 'from-amber-400/80' },
+  ready: { label: 'Siap tayang', chip: 'border-sky-500/40 bg-sky-500/10 text-sky-300', accent: 'from-sky-500/80' },
+  published: { label: 'Terbit', chip: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300', accent: 'from-emerald-500/80' },
+  cancelled: { label: 'Dibatalkan', chip: 'border-rose-500/40 bg-rose-500/10 text-rose-300', accent: 'from-rose-500/80' },
+}
+
+const CHANNEL_LABEL = { media: 'Media', sosial: 'Sosial', both: 'Media + Sosial' }
+
+function statusOf(item) {
+  return STATUS_META[item.status] || { label: item.status, chip: 'border-[#30363d] text-[#c9d1d9]', accent: 'from-slate-500/80' }
 }
 
 const themeLabel = {
@@ -323,31 +329,40 @@ onMounted(() => {
     </div>
     <div v-else class="space-y-5">
       <section v-for="[day, dayItems] in grouped" :key="day">
-        <h2 class="mb-2 text-sm font-semibold text-banten-navy/70">
+        <h2 class="mb-2 text-xs font-semibold uppercase tracking-wider text-[#8b949e]">
           {{ new Date(day + 'T00:00:00').toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) }}
         </h2>
-        <div class="space-y-2">
+        <div class="space-y-3">
           <article
             v-for="item in dayItems"
             :key="item.id"
-            class="rounded-xl border border-banten-navy/10 bg-white/80 px-4 py-3"
+            class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22]"
           >
-            <div class="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div class="flex flex-wrap items-center gap-2">
-                  <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="statusColor[item.status]">
-                    {{ item.status }}
-                  </span>
-                  <span class="text-xs text-banten-navy/50">{{ themeLabel[item.theme] || item.theme }} · {{ item.channel }}</span>
-                </div>
-                <h3 class="mt-1.5 font-display text-lg text-banten-navy">{{ item.title }}</h3>
-                <p v-if="item.description" class="mt-1 text-sm text-banten-navy/70">{{ item.description }}</p>
-                <p v-if="item.target_media" class="mt-1 text-xs text-banten-navy/50">Target: {{ item.target_media }}</p>
+            <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent" :class="statusOf(item).accent" aria-hidden="true" />
+            <div class="px-5 py-4 pl-6">
+              <div class="flex items-start justify-between gap-3">
+                <h3 class="text-base font-semibold leading-snug text-white">{{ item.title }}</h3>
+                <span class="shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold" :class="statusOf(item).chip">
+                  {{ statusOf(item).label }}
+                </span>
               </div>
-              <div v-if="canManage && item.status !== 'cancelled'" class="flex gap-2 text-xs">
-                <button type="button" class="text-banten-gold hover:underline" @click="editItem(item)">Edit</button>
-                <button type="button" class="text-banten-red hover:underline" @click="cancelItem(item)">Batalkan</button>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-[#c9d1d9]">
+                  {{ themeLabel[item.theme] || item.theme }}
+                </span>
+                <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-[#c9d1d9]">
+                  {{ CHANNEL_LABEL[item.channel] || item.channel }}
+                </span>
               </div>
+              <p v-if="item.description" class="mt-2 line-clamp-2 text-sm leading-relaxed text-[#8b949e]">{{ item.description }}</p>
+              <p v-if="item.target_media" class="mt-1 text-xs text-[#6e7681]">Target: {{ item.target_media }}</p>
+            </div>
+            <div
+              v-if="canManage && item.status !== 'cancelled'"
+              class="flex gap-4 border-t border-[#30363d]/80 px-5 py-2.5 pl-6 text-xs font-semibold"
+            >
+              <button type="button" class="text-emerald-300 hover:text-emerald-200" @click="editItem(item)">Edit</button>
+              <button type="button" class="text-rose-300 hover:text-rose-200" @click="cancelItem(item)">Batalkan</button>
             </div>
           </article>
         </div>

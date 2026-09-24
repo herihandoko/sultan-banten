@@ -6,7 +6,8 @@ const PROJECT_KEY = 'sb_sipantau_project_id'
 
 export const useProjectStore = defineStore('project', () => {
   const projects = ref([])
-  const selectedId = ref(localStorage.getItem(PROJECT_KEY) || '')
+  const selectedId = ref('')
+  localStorage.removeItem(PROJECT_KEY)
   const loading = ref(false)
   const error = ref('')
   const source = ref('')

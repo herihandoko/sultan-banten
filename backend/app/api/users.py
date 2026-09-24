@@ -38,6 +38,12 @@ def list_users():
     q = (request.args.get("q") or "").strip()
     role_code = (request.args.get("role_code") or "").strip()
     active = request.args.get("active")  # 1 | 0 | omit
+    opd_id_raw = (request.args.get("opd_id") or "").strip()
+    sort_by = (request.args.get("sort_by") or "created_at").strip().lower()
+    sort_dir = (request.args.get("sort_dir") or "desc").strip().lower()
+    if sort_dir not in {"asc", "desc"}:
+        sort_dir = "desc"
+
     query = User.query
     if role_code:
         role = Role.query.filter_by(code=role_code).first()
@@ -49,6 +55,12 @@ def list_users():
         query = query.filter_by(is_active=True)
     elif active == "0":
         query = query.filter_by(is_active=False)
+    if opd_id_raw:
+        try:
+            opd_id = int(opd_id_raw)
+        except ValueError:
+            return jsonify({"error": "opd_id tidak valid"}), 400
+        query = query.filter_by(opd_id=opd_id)
     if q:
         like = f"%{q}%"
         query = query.filter(
@@ -56,10 +68,32 @@ def list_users():
                 User.username.ilike(like),
                 User.full_name.ilike(like),
                 User.email.ilike(like),
+                User.phone.ilike(like),
                 User.opd_name.ilike(like),
             )
         )
-    query = query.order_by(User.created_at.desc())
+
+    sort_map = {
+        "full_name": User.full_name,
+        "name": User.full_name,
+        "username": User.username,
+        "email": User.email,
+        "phone": User.phone,
+        "opd": User.opd_name,
+        "opd_name": User.opd_name,
+        "created_at": User.created_at,
+        "is_active": User.is_active,
+        "status": User.is_active,
+        "role": Role.name,
+    }
+    col = sort_map.get(sort_by, User.created_at)
+    if sort_by in {"role"}:
+        query = query.outerjoin(Role, User.role_id == Role.id)
+    order_expr = col.asc() if sort_dir == "asc" else col.desc()
+    # Nulls last for optional fields when ascending name-like sorts
+    if sort_by in {"phone", "opd", "opd_name"} and hasattr(order_expr, "nulls_last"):
+        order_expr = order_expr.nulls_last()
+    query = query.order_by(order_expr, User.id.desc())
     return jsonify(paginate(query, lambda u: u.to_dict()))
 
 
@@ -101,6 +135,7 @@ def create_user():
         username=data["username"].strip(),
         email=data["email"].strip().lower(),
         full_name=data["full_name"].strip(),
+        phone=(data.get("phone") or "").strip() or None,
         role_id=role.id,
         opd_id=opd_id,
         opd_name=opd_name,
@@ -123,6 +158,10 @@ def update_user(user_id: int):
         if not name:
             return jsonify({"error": "full_name tidak boleh kosong"}), 400
         user.full_name = name
+
+    if "phone" in data:
+        phone = (data.get("phone") or "").strip()
+        user.phone = phone or None
 
     if "email" in data:
         email = (data.get("email") or "").strip().lower()

@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
+import ContentDraftFields from '../components/ContentDraftFields.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -12,6 +13,8 @@ const loading = ref(true)
 const error = ref('')
 const saving = ref(false)
 const formError = ref('')
+const formNotice = ref('')
+const savePending = ref(false)
 const editForm = ref({ title: '', body: '', media_url: '', content_type: 'text_release' })
 const reviewNotes = ref('')
 
@@ -34,6 +37,46 @@ const canEdit = computed(() => ['super_admin', 'editor'].includes(role.value))
 const canApprove = computed(() => ['super_admin', 'pimpinan'].includes(role.value))
 const isEditable = computed(() => item.value && ['draft', 'rejected'].includes(item.value.status))
 
+const approvals = computed(() => {
+  const list = item.value?.approvals || []
+  return [...list].sort((a, b) => String(b.decided_at || '').localeCompare(String(a.decided_at || '')))
+})
+
+function decisionMeta(decision) {
+  if (decision === 'approved') {
+    return {
+      label: 'Disetujui',
+      chip: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+      dot: 'bg-emerald-400',
+    }
+  }
+  return {
+    label: 'Ditolak',
+    chip: 'border-rose-500/40 bg-rose-500/10 text-rose-300',
+    dot: 'bg-rose-400',
+  }
+}
+
+function formatDateTime(iso) {
+  if (!iso) return ''
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`
+  const d = new Date(normalized)
+  if (Number.isNaN(d.getTime())) return iso
+  const date = d.toLocaleDateString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
+  const time = d.toLocaleTimeString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+  return `${date} · ${time} WIB`
+}
+
 async function load() {
   loading.value = true
   error.value = ''
@@ -55,20 +98,25 @@ async function load() {
 
 async function save() {
   saving.value = true
+  savePending.value = true
   formError.value = ''
+  formNotice.value = ''
   try {
     const { data } = await api.patch(`/content/${route.params.id}`, editForm.value)
     item.value = data.data
+    formNotice.value = 'Draft tersimpan.'
   } catch (err) {
     formError.value = err.response?.data?.error || 'Gagal menyimpan'
   } finally {
     saving.value = false
+    savePending.value = false
   }
 }
 
 async function submitReview() {
   saving.value = true
   formError.value = ''
+  formNotice.value = ''
   try {
     if (isEditable.value) {
       await api.patch(`/content/${route.params.id}`, editForm.value)
@@ -135,10 +183,10 @@ onMounted(load)
         <section class="space-y-4 lg:col-span-2">
           <div
             v-if="item.issue?.narrative_card || item.issue?.summary"
-            class="rounded-xl border border-banten-gold/30 bg-amber-50/50 p-5"
+            class="issue-brief rounded-xl border border-banten-gold/30 bg-amber-50/60 p-5"
           >
-            <h2 class="font-display text-lg text-banten-navy">Acuan Mata Bathin</h2>
-            <p class="mt-2 text-sm text-banten-navy/80 whitespace-pre-wrap">
+            <h2 class="issue-brief-title font-display text-lg">Acuan Mata Bathin</h2>
+            <p class="mt-2 whitespace-pre-wrap text-sm">
               {{ item.issue.narrative_card?.statement || item.issue.summary }}
             </p>
           </div>
@@ -149,32 +197,21 @@ onMounted(load)
             </h2>
 
             <template v-if="isEditable && canEdit">
-              <label class="mt-4 block text-sm font-medium text-banten-navy">Judul</label>
-              <input
-                v-model="editForm.title"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
-              />
-              <label class="mt-3 block text-sm font-medium text-banten-navy">Tipe</label>
-              <select
-                v-model="editForm.content_type"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
-              >
-                <option value="text_release">Rilis Teks</option>
-                <option value="infographic">Infografis</option>
-                <option value="video">Video</option>
-              </select>
-              <label class="mt-3 block text-sm font-medium text-banten-navy">Isi</label>
-              <textarea
-                v-model="editForm.body"
-                rows="10"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
-              />
-              <label class="mt-3 block text-sm font-medium text-banten-navy">URL media</label>
-              <input
-                v-model="editForm.media_url"
-                class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
-              />
+              <div class="mt-4 grid gap-3 md:grid-cols-2">
+                <ContentDraftFields
+                  v-model:content-type="editForm.content_type"
+                  v-model:title="editForm.title"
+                  v-model:body="editForm.body"
+                  v-model:media-url="editForm.media_url"
+                />
+              </div>
               <p v-if="formError" class="mt-3 text-sm text-banten-red">{{ formError }}</p>
+              <p
+                v-if="formNotice"
+                class="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800"
+              >
+                {{ formNotice }}
+              </p>
               <div class="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"
@@ -182,7 +219,7 @@ onMounted(load)
                   :disabled="saving"
                   @click="save"
                 >
-                  Simpan
+                  {{ savePending ? 'Menyimpan...' : 'Simpan' }}
                 </button>
                 <button
                   type="button"
@@ -196,7 +233,7 @@ onMounted(load)
             </template>
 
             <template v-else>
-              <p class="mt-3 whitespace-pre-wrap text-sm text-banten-navy/85">
+              <p class="mt-3 whitespace-pre-wrap text-sm text-banten-navy">
                 {{ item.body || '—' }}
               </p>
               <a
@@ -259,27 +296,34 @@ onMounted(load)
             </RouterLink>
           </div>
 
-          <div class="rounded-xl border border-banten-navy/10 bg-white/80 p-5">
-            <h2 class="font-display text-lg text-banten-navy">Riwayat Approval</h2>
-            <div v-if="!item.approvals?.length" class="mt-2 text-sm text-banten-navy/60">
-              Belum ada keputusan.
-            </div>
-            <ul v-else class="mt-3 space-y-2">
-              <li
-                v-for="a in item.approvals"
-                :key="a.id"
-                class="rounded-md border border-banten-navy/10 px-3 py-2 text-sm"
-              >
+          <div class="rounded-2xl border border-[#30363d] bg-[#161b22] p-5">
+            <h2 class="text-base font-semibold text-white">Riwayat Approval</h2>
+            <p class="mt-1 text-[11px] text-[#6e7681]">Keputusan pimpinan atas naskah ini</p>
+            <p v-if="!approvals.length" class="mt-4 text-sm text-[#8b949e]">Belum ada keputusan.</p>
+            <ol v-else class="mt-4 space-y-3">
+              <li v-for="a in approvals" :key="a.id" class="relative pl-4">
                 <span
-                  class="rounded px-2 py-0.5 text-xs font-semibold"
-                  :class="a.decision === 'approved' ? statusColor.approved : statusColor.rejected"
-                >
-                  {{ a.decision }}
-                </span>
-                <p v-if="a.notes" class="mt-1 text-banten-navy/75">{{ a.notes }}</p>
-                <p class="mt-1 text-xs text-banten-navy/45">{{ a.decided_at }}</p>
+                  class="absolute left-0 top-3 h-2 w-2 rounded-full"
+                  :class="decisionMeta(a.decision).dot"
+                  aria-hidden="true"
+                />
+                <div class="rounded-xl border border-[#30363d] bg-[#0d1117] px-3 py-2.5">
+                  <span
+                    class="inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-semibold"
+                    :class="decisionMeta(a.decision).chip"
+                  >
+                    {{ decisionMeta(a.decision).label }}
+                  </span>
+                  <p class="mt-2 text-sm leading-relaxed text-[#e6edf3]">
+                    {{ a.notes || 'Tanpa catatan.' }}
+                  </p>
+                  <p class="mt-2 text-[11px] text-[#6e7681]">
+                    {{ a.reviewer_name || 'Pimpinan' }}
+                    <span v-if="a.decided_at"> · {{ formatDateTime(a.decided_at) }}</span>
+                  </p>
+                </div>
               </li>
-            </ul>
+            </ol>
           </div>
         </section>
       </div>

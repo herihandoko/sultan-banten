@@ -31,7 +31,8 @@ def sync_sipantau_crises(project_id: str | None = None) -> dict[str, Any]:
     if not base:
         return {"error": "SIPANTAU_INTERNAL_URL kosong", "candidates": 0, "pushed": 0}
 
-    body: dict[str, Any] = {}
+    # All NEGATIVE mentions on projects that still exist in SIPANTAU.
+    body: dict[str, Any] = {"all_negative": True}
     if project_id:
         body["keyword_id"] = project_id
 

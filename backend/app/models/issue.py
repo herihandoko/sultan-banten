@@ -1,8 +1,81 @@
 """Crisis Room issue models."""
 
+import re
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from app.extensions import db
+
+_PRODUCT_NAME = re.compile(r"\s*\b(?:di\s+)?SIPANTAU\b", re.IGNORECASE)
+
+
+def public_action_text(value) -> str:
+    """User-facing action wording, without internal product names."""
+    text = _PRODUCT_NAME.sub("", str(value or ""))
+    text = re.sub(r"\s{2,}", " ", text).strip(" \t-–—")
+    return text
+
+
+def public_actions(actions):
+    if not isinstance(actions, list):
+        return actions
+    cleaned = []
+    for item in actions:
+        if not isinstance(item, str):
+            if item:
+                cleaned.append(item)
+            continue
+        text = public_action_text(item)
+        if text:
+            cleaned.append(text)
+    return cleaned
+
+
+def _hostname_label(url: str | None) -> str | None:
+    if not url:
+        return None
+    try:
+        host = (urlparse(str(url)).hostname or "").lower()
+    except Exception:
+        return None
+    if not host:
+        return None
+    if host.startswith("www."):
+        host = host[4:]
+    # Skip generic aggregators when possible
+    if host in {"google.com", "news.google.com", "google.co.id"}:
+        return None
+    return host
+
+
+def _pretty_platform(value: str) -> str | None:
+    """Map social platforms to display labels. Generic 'news' returns None."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    key = raw.lower()
+    # Too generic for a badge — callers should fall back to hostname/outlet
+    if key in {"news", "blog", "media", "media online", "other", "web"}:
+        return None
+    mapping = {
+        "twitter": "X / Twitter",
+        "x": "X / Twitter",
+        "tiktok": "TikTok",
+        "instagram": "Instagram",
+        "youtube": "YouTube",
+        "facebook": "Facebook",
+        "forum": "Forum",
+        "reddit": "Reddit",
+    }
+    return mapping.get(key, raw)
+
+
+def _display_host(host: str) -> str:
+    """Keep hostname readable (bantenraya.co.id, detik.com)."""
+    h = (host or "").lower().strip()
+    if h.startswith("www."):
+        h = h[4:]
+    return h
 
 
 class Issue(db.Model):
@@ -38,6 +111,59 @@ class Issue(db.Model):
     validations = db.relationship("OpdValidation", back_populates="issue", cascade="all, delete-orphan")
     content_items = db.relationship("ContentItem", back_populates="issue", cascade="all, delete-orphan")
 
+    def primary_source_label(self) -> str | None:
+        """Human outlet/platform for UI (tiktok, detik.com, …) — not sipantau/mata_bathin."""
+        skip = {
+            "sipantau",
+            "mata_bathin",
+            "manual",
+            "media online",
+            "media",
+            "news",
+            "blog",
+            "social",
+            "other",
+            "web",
+        }
+        assessment = self.risk_assessment if isinstance(self.risk_assessment, dict) else {}
+
+        # 1) Named outlet from assessment
+        for key in ("outlet", "source_name", "author_name", "publisher"):
+            val = assessment.get(key)
+            if val and str(val).strip().lower() not in skip:
+                return str(val).strip()[:80]
+
+        # 2) Evidence URL hostname (detik.com, bantenraya.co.id, …)
+        for ev in self.evidence or []:
+            host = _hostname_label(ev.url)
+            if host:
+                return _display_host(host)[:80]
+            name = (ev.source_name or "").strip()
+            if name and name.lower() not in skip:
+                return name[:80]
+
+        # 3) Specific social platform only (tiktok, twitter, …) — never generic "news"
+        platform = assessment.get("platform")
+        pretty = _pretty_platform(str(platform)) if platform else None
+        if pretty and pretty.lower() not in skip:
+            return pretty[:80]
+
+        return None
+
+    def primary_source_url(self) -> str | None:
+        """First usable evidence / assessment URL for Visit actions."""
+        assessment = self.risk_assessment if isinstance(self.risk_assessment, dict) else {}
+        for key in ("url", "source_url", "article_url", "evidence_pack_url", "link"):
+            val = assessment.get(key)
+            if val and str(val).strip().startswith(("http://", "https://")):
+                return str(val).strip()[:2000]
+
+        for ev in self.evidence or []:
+            url = (ev.url or "").strip()
+            if url.startswith(("http://", "https://")):
+                return url[:2000]
+        return None
+
     def to_dict(self, include_relations: bool = False):
         data = {
             "id": self.id,
@@ -47,9 +173,11 @@ class Issue(db.Model):
             "why_now": self.why_now,
             "risk_level": self.risk_level,
             "risk_assessment": self.risk_assessment,
-            "recommended_actions": self.recommended_actions,
+            "recommended_actions": public_actions(self.recommended_actions),
             "status": self.status,
             "source": self.source,
+            "source_label": self.primary_source_label(),
+            "source_url": self.primary_source_url(),
             "project_id": self.project_id,
             "narrative_card": self.narrative_card,
             "assigned_to": self.assigned_to,

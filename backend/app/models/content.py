@@ -63,12 +63,14 @@ class ContentApproval(db.Model):
     )
 
     content_item = db.relationship("ContentItem", back_populates="approvals")
+    reviewer = db.relationship("User", foreign_keys=[reviewer_id])
 
     def to_dict(self):
         return {
             "id": self.id,
             "content_id": self.content_id,
             "reviewer_id": self.reviewer_id,
+            "reviewer_name": self.reviewer.full_name if self.reviewer else None,
             "decision": self.decision,
             "notes": self.notes,
             "decided_at": self.decided_at.isoformat() if self.decided_at else None,

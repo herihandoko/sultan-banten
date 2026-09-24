@@ -18,12 +18,12 @@ FONNTE_SEND_URL = "https://api.fonnte.com/send"
 
 def _cfg(key: str, default: str = "") -> str:
     try:
-        from flask import current_app, has_app_context
+        from flask import has_app_context
 
         if has_app_context():
-            val = current_app.config.get(key)
-            if val is not None and str(val) != "":
-                return str(val)
+            from app.services.app_settings import messaging_value
+
+            return messaging_value(key, default)
     except Exception:
         pass
     return os.getenv(key, default)
@@ -84,7 +84,7 @@ def send_whatsapp(to: str, message: str) -> dict[str, Any]:
             "channel": "whatsapp",
             "to": target,
             "status": "failed",
-            "error": "FONNTE_TOKEN belum dikonfigurasi",
+            "error": "Token WhatsApp belum diisi di Pengaturan",
         }
 
     payload = {
@@ -166,7 +166,7 @@ def send_email(to: str, subject: str, body: str) -> dict[str, Any]:
             "channel": "email",
             "to": to_addr,
             "status": "failed",
-            "error": "MAIL_ENABLED=false — aktifkan di env untuk kirim email",
+            "error": "Email belum diaktifkan di Pengaturan",
         }
 
     host = _cfg("MAIL_HOST").strip()
@@ -182,7 +182,7 @@ def send_email(to: str, subject: str, body: str) -> dict[str, Any]:
             "channel": "email",
             "to": to_addr,
             "status": "failed",
-            "error": "MAIL_HOST / MAIL_FROM_ADDRESS belum lengkap",
+            "error": "Host atau alamat pengirim email belum lengkap",
         }
 
     msg = EmailMessage()

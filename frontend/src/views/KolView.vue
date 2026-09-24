@@ -60,19 +60,29 @@ const canManage = computed(() =>
   ['super_admin', 'media_kol_admin'].includes(auth.user?.role?.code),
 )
 
-const contractColor = {
-  prospect: 'bg-slate-200 text-slate-700',
-  active: 'bg-emerald-100 text-emerald-800',
-  expired: 'bg-amber-100 text-amber-800',
-  terminated: 'bg-red-100 text-red-800',
+const CONTRACT_META = {
+  prospect: { label: 'Prospek', chip: 'border-slate-500/40 bg-slate-500/10 text-slate-300', accent: 'from-slate-400/80' },
+  active: { label: 'Aktif', chip: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300', accent: 'from-emerald-500/80' },
+  expired: { label: 'Habis', chip: 'border-amber-500/40 bg-amber-500/10 text-amber-300', accent: 'from-amber-400/80' },
+  terminated: { label: 'Dihentikan', chip: 'border-rose-500/40 bg-rose-500/10 text-rose-300', accent: 'from-rose-500/80' },
 }
 
-const campaignColor = {
-  planned: 'bg-slate-200 text-slate-700',
-  in_progress: 'bg-amber-100 text-amber-800',
-  published: 'bg-sky-100 text-sky-800',
-  completed: 'bg-emerald-100 text-emerald-800',
-  cancelled: 'bg-red-100 text-red-800',
+const CAMPAIGN_META = {
+  planned: { label: 'Direncanakan', chip: 'border-slate-500/40 bg-slate-500/10 text-slate-300', accent: 'from-slate-400/80' },
+  in_progress: { label: 'Berjalan', chip: 'border-amber-500/40 bg-amber-500/10 text-amber-300', accent: 'from-amber-400/80' },
+  published: { label: 'Tayang', chip: 'border-sky-500/40 bg-sky-500/10 text-sky-300', accent: 'from-sky-500/80' },
+  completed: { label: 'Selesai', chip: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300', accent: 'from-emerald-500/80' },
+  cancelled: { label: 'Dibatalkan', chip: 'border-rose-500/40 bg-rose-500/10 text-rose-300', accent: 'from-rose-500/80' },
+}
+
+const BUDGET_LABEL = { planned: 'Anggaran rencana', approved: 'Anggaran disetujui', paid: 'Sudah dibayar', cancelled: 'Anggaran batal' }
+
+function contractOf(partner) {
+  return CONTRACT_META[partner.contract_status] || { label: partner.contract_status, chip: 'border-[#30363d] text-[#c9d1d9]', accent: 'from-slate-500/80' }
+}
+
+function campaignOf(item) {
+  return CAMPAIGN_META[item.status] || { label: item.status, chip: 'border-[#30363d] text-[#c9d1d9]', accent: 'from-slate-500/80' }
 }
 
 function formatNum(n) {
@@ -108,7 +118,7 @@ async function load() {
     campaigns.value = cRes.data.data || []
     campaignsMeta.value = cRes.data.meta || null
   } catch (err) {
-    error.value = err.response?.data?.error || 'Gagal memuat data KOL'
+    error.value = err.response?.data?.error || 'Gagal memuat data influencer'
   } finally {
     loading.value = false
   }
@@ -183,7 +193,7 @@ async function savePartner() {
     resetPartnerForm()
     await load()
   } catch (err) {
-    formError.value = err.response?.data?.error || 'Gagal menyimpan KOL'
+    formError.value = err.response?.data?.error || 'Gagal menyimpan influencer'
   } finally {
     saving.value = false
   }
@@ -262,9 +272,9 @@ onMounted(load)
   <div>
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-display text-3xl text-banten-navy">KOL Management</h1>
+        <h1 class="font-display text-3xl text-banten-navy">Influencer (KOL)</h1>
         <p class="mt-1 text-sm text-banten-navy/65">
-          F.12 Direktori KOL · F.13 Campaign Tracker
+          Direktori KOL dan campaign tracker
         </p>
       </div>
       <div class="flex gap-1 rounded-md border border-banten-navy/15 bg-white/70 p-1 text-xs">
@@ -364,7 +374,7 @@ onMounted(load)
           class="rounded-md bg-banten-navy px-3 py-2 text-xs text-white"
           @click="showForm = !showForm; if (!showForm) resetPartnerForm()"
         >
-          {{ showForm ? 'Tutup' : '+ Tambah KOL' }}
+          {{ showForm ? 'Tutup' : '+ Tambah Influencer' }}
         </button>
       </div>
 
@@ -374,7 +384,7 @@ onMounted(load)
         @submit.prevent="savePartner"
       >
         <h2 class="font-display text-lg text-banten-navy">
-          {{ editingId ? 'Edit KOL' : 'KOL Baru' }}
+          {{ editingId ? 'Edit Influencer' : 'Influencer baru' }}
         </h2>
         <div class="mt-4 grid gap-3 md:grid-cols-2">
           <div>
@@ -420,35 +430,32 @@ onMounted(load)
       </form>
 
       <div v-if="!partners.length" class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-12 text-center text-sm text-banten-navy/60">
-        Belum ada KOL.
+        Belum ada influencer.
       </div>
       <div v-else class="grid gap-3 md:grid-cols-2">
         <article
           v-for="p in partners"
           :key="p.id"
-          class="rounded-xl border border-banten-navy/10 bg-white/80 px-5 py-4"
+          class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22]"
         >
-          <div class="flex items-start justify-between gap-2">
-            <div>
-              <p class="font-display text-lg text-banten-navy">{{ p.name }}</p>
-              <p class="text-xs text-banten-navy/55">{{ p.platform }} · {{ p.handle || '—' }}</p>
+          <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent" :class="contractOf(p).accent" aria-hidden="true" />
+          <div class="px-5 py-4 pl-6">
+            <div class="flex items-start justify-between gap-2">
+              <h2 class="text-base font-semibold text-white">{{ p.name }}</h2>
+              <span class="shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold" :class="contractOf(p).chip">
+                {{ contractOf(p).label }}
+              </span>
             </div>
-            <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="contractColor[p.contract_status]">
-              {{ p.contract_status }}
-            </span>
+            <p class="mt-1 text-xs text-[#8b949e]">{{ p.platform }} · {{ p.handle || 'tanpa handle' }}</p>
+            <div class="mt-3 flex flex-wrap gap-2 text-[11px]">
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">{{ formatNum(p.followers) }} followers</span>
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">ER {{ p.engagement_rate }}%</span>
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">{{ p.campaign_count || 0 }} campaign</span>
+            </div>
+            <p v-if="p.topics" class="mt-2 line-clamp-2 text-xs text-[#6e7681]">{{ p.topics }}</p>
           </div>
-          <p class="mt-3 text-sm text-banten-navy/75">
-            {{ formatNum(p.followers) }} followers · ER {{ p.engagement_rate }}%
-          </p>
-          <p v-if="p.topics" class="mt-1 text-xs text-banten-navy/55">{{ p.topics }}</p>
-          <div class="mt-3 flex items-center justify-between text-xs">
-            <span class="text-banten-navy/50">{{ p.campaign_count || 0 }} campaign</span>
-            <button
-              v-if="canManage"
-              type="button"
-              class="text-banten-gold hover:underline"
-              @click="editPartner(p)"
-            >
+          <div v-if="canManage" class="border-t border-[#30363d]/80 px-5 py-2.5 pl-6">
+            <button type="button" class="text-xs font-semibold text-emerald-300 hover:text-emerald-200" @click="editPartner(p)">
               Edit
             </button>
           </div>
@@ -479,7 +486,7 @@ onMounted(load)
         </h2>
         <div class="mt-4 grid gap-3 md:grid-cols-2">
           <div>
-            <label class="text-sm font-medium text-banten-navy">KOL</label>
+            <label class="text-sm font-medium text-banten-navy">Influencer</label>
             <select v-model="campaignForm.kol_id" required class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
               <option v-for="p in partnersAll" :key="p.id" :value="p.id">{{ p.name }} · {{ p.platform }}</option>
             </select>
@@ -531,46 +538,44 @@ onMounted(load)
       </form>
 
       <div v-if="!campaigns.length" class="rounded-xl border border-dashed border-banten-navy/20 px-6 py-12 text-center text-sm text-banten-navy/60">
-        Belum ada campaign KOL.
+        Belum ada campaign.
       </div>
       <div v-else class="space-y-3">
         <article
           v-for="c in campaigns"
           :key="c.id"
-          class="rounded-xl border border-banten-navy/10 bg-white/80 px-5 py-4"
+          class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22]"
         >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="campaignColor[c.status]">
-                  {{ c.status }}
-                </span>
-                <span class="text-xs text-banten-navy/50">{{ c.budget_status }}</span>
-              </div>
-              <h2 class="mt-2 font-display text-xl text-banten-navy">{{ c.title }}</h2>
-              <p class="mt-1 text-sm text-banten-navy/65">
-                {{ c.kol?.name || `KOL #${c.kol_id}` }} · {{ c.kol?.platform }} {{ c.kol?.handle }}
-              </p>
-              <p class="mt-2 text-xs text-banten-navy/55">
-                {{ formatNum(c.views) }} views · {{ formatNum(c.likes) }} likes · {{ formatNum(c.comments) }} comments
-                · {{ formatMoney(c.budget) }}
-              </p>
-              <a
-                v-if="c.deliverable_url"
-                :href="c.deliverable_url"
-                target="_blank"
-                rel="noopener"
-                class="mt-2 inline-block text-xs text-banten-gold hover:underline"
-              >
-                Lihat deliverable
-              </a>
+          <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent" :class="campaignOf(c).accent" aria-hidden="true" />
+          <div class="px-5 py-4 pl-6">
+            <div class="flex items-start justify-between gap-3">
+              <h2 class="text-base font-semibold leading-snug text-white">{{ c.title }}</h2>
+              <span class="shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold" :class="campaignOf(c).chip">
+                {{ campaignOf(c).label }}
+              </span>
             </div>
-            <button
-              v-if="canManage"
-              type="button"
-              class="text-xs text-banten-gold hover:underline"
-              @click="editCampaign(c)"
+            <p class="mt-1 text-sm text-[#8b949e]">
+              {{ c.kol?.name || `Influencer #${c.kol_id}` }} · {{ c.kol?.platform }} {{ c.kol?.handle }}
+            </p>
+            <div class="mt-3 flex flex-wrap gap-2 text-[11px]">
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">{{ formatNum(c.views) }} views</span>
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">{{ formatNum(c.likes) }} likes</span>
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">{{ formatNum(c.comments) }} komentar</span>
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-[#c9d1d9]">{{ formatMoney(c.budget) }}</span>
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-1 text-amber-200">{{ BUDGET_LABEL[c.budget_status] || c.budget_status }}</span>
+            </div>
+            <a
+              v-if="c.deliverable_url"
+              :href="c.deliverable_url"
+              target="_blank"
+              rel="noopener"
+              class="mt-2 inline-flex text-xs font-semibold text-sky-300 hover:text-emerald-300"
             >
+              Lihat deliverable
+            </a>
+          </div>
+          <div v-if="canManage" class="border-t border-[#30363d]/80 px-5 py-2.5 pl-6">
+            <button type="button" class="text-xs font-semibold text-emerald-300 hover:text-emerald-200" @click="editCampaign(c)">
               Update
             </button>
           </div>

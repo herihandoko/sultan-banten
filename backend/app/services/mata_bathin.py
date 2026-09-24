@@ -12,6 +12,7 @@ from flask import current_app
 
 from app.extensions import db
 from app.models import Issue, IssueEvidence
+from app.models.issue import public_actions
 
 
 class MataBathinClient:
@@ -76,7 +77,7 @@ def ingest_crisis_alert(payload: dict[str, Any]) -> tuple[Issue, bool]:
         existing.why_now = payload.get("why_now") or existing.why_now
         existing.risk_level = risk
         existing.risk_assessment = assessment
-        existing.recommended_actions = payload.get("recommended_actions")
+        existing.recommended_actions = public_actions(payload.get("recommended_actions"))
         existing.narrative_card = payload.get("narrative_card")
         issue = existing
         created = False
@@ -88,7 +89,7 @@ def ingest_crisis_alert(payload: dict[str, Any]) -> tuple[Issue, bool]:
             why_now=payload.get("why_now"),
             risk_level=risk,
             risk_assessment=assessment,
-            recommended_actions=payload.get("recommended_actions"),
+            recommended_actions=public_actions(payload.get("recommended_actions")),
             narrative_card=payload.get("narrative_card"),
             status="open",
             source=payload.get("source")
@@ -120,21 +121,53 @@ def ingest_crisis_alert(payload: dict[str, Any]) -> tuple[Issue, bool]:
             }
 
     evidence_url = payload.get("evidence_pack_url")
+    assessment_dict = assessment if isinstance(assessment, dict) else {}
+    outlet = (
+        payload.get("outlet")
+        or payload.get("source_name")
+        or assessment_dict.get("outlet")
+        or assessment_dict.get("author_name")
+        or assessment_dict.get("platform")
+    )
     if evidence_url:
         evidence_url = str(evidence_url).strip()
         # Google News RSS links can exceed VARCHAR(500)
         if len(evidence_url) > 2000:
             evidence_url = evidence_url[:2000]
         if evidence_url and not any(e.url == evidence_url for e in (issue.evidence or [])):
+            from app.models.issue import _hostname_label, _pretty_platform
+
+            source_name = None
+            if outlet and str(outlet).strip().lower() not in {
+                "sipantau",
+                "mata_bathin",
+                "manual",
+                "news",
+                "blog",
+                "media",
+                "media online",
+            }:
+                pretty = _pretty_platform(str(outlet))
+                source_name = pretty or str(outlet)
+            source_name = source_name or _hostname_label(evidence_url) or None
+            if not source_name:
+                source_name = "Media"
             db.session.add(
                 IssueEvidence(
                     issue_id=issue.id,
-                    title="Evidence Pack SIPANTAU",
+                    title="Evidence Pack",
                     url=evidence_url,
-                    source_name=payload.get("source") or "SIPANTAU",
+                    source_name=str(source_name)[:150],
                     evidence_type="other",
                 )
             )
+
+    # Enrich assessment with outlet for list badges
+    if outlet and isinstance(issue.risk_assessment, dict):
+        issue.risk_assessment = {
+            **issue.risk_assessment,
+            "outlet": str(outlet)[:80],
+        }
 
     from app.services.alerts import maybe_alert_on_issue
 

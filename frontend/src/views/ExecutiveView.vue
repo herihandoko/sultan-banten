@@ -11,6 +11,7 @@ import {
   LinearScale,
   Tooltip,
 } from 'chart.js'
+import PageLoader from '../components/PageLoader.vue'
 import api from '../services/api'
 import RiskBadge from '../components/RiskBadge.vue'
 import RiskLegend from '../components/RiskLegend.vue'
@@ -21,6 +22,7 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, ArcElement, Tooltip, Le
 
 const data = ref(null)
 const loading = ref(true)
+const reveal = ref(false)
 const error = ref('')
 
 const brand = {
@@ -32,6 +34,7 @@ const brand = {
 
 async function load() {
   loading.value = true
+  reveal.value = false
   error.value = ''
   try {
     const res = await api.get('/executive/dashboard')
@@ -80,9 +83,9 @@ const riskChartOptions = {
   scales: {
     x: {
       ticks: {
+        color: '#8b949e',
         callback(value) {
-          const label = this.getLabelForValue(value)
-          return label
+          return this.getLabelForValue(value)
         },
         font: { size: 11 },
       },
@@ -90,10 +93,23 @@ const riskChartOptions = {
     },
     y: {
       beginAtZero: true,
-      ticks: { precision: 0, font: { size: 11 } },
-      grid: { color: 'rgba(27, 58, 92, 0.06)' },
+      ticks: { precision: 0, color: '#8b949e', font: { size: 11 } },
+      grid: { color: 'rgba(48, 54, 61, 0.9)' },
+      border: { display: false },
     },
   },
+}
+
+const CONTENT_STATUS = {
+  draft: 'Draf',
+  in_review: 'Review',
+  approved: 'Disetujui',
+  rejected: 'Ditolak',
+  published: 'Terbit',
+}
+
+function contentStatusLabel(status) {
+  return CONTENT_STATUS[status] || status
 }
 
 const asnChart = computed(() => {
@@ -104,7 +120,7 @@ const asnChart = computed(() => {
       {
         label: 'Partisipasi',
         data: rows.map((r) => r.total),
-        backgroundColor: brand.navy,
+        backgroundColor: '#38bdf8',
       },
     ],
   }
@@ -120,7 +136,7 @@ const contentChart = computed(() => {
     published: '#38bdf8',
   }
   return {
-    labels: rows.map((r) => r.status),
+    labels: rows.map((r) => contentStatusLabel(r.status)),
     datasets: [
       {
         data: rows.map((r) => r.count),
@@ -134,12 +150,23 @@ const chartOptions = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: '#8b949e', font: { size: 10 } }, grid: { display: false } },
+    y: {
+      beginAtZero: true,
+      ticks: { precision: 0, color: '#8b949e', font: { size: 11 } },
+      grid: { color: 'rgba(48, 54, 61, 0.9)' },
+      border: { display: false },
+    },
+  },
 }
 
 const doughnutOptions = {
   responsive: true,
   maintainAspectRatio: false,
-  plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } } },
+  plugins: {
+    legend: { position: 'bottom', labels: { boxWidth: 10, color: '#c9d1d9', font: { size: 11 } } },
+  },
 }
 
 function formatNum(n) {
@@ -153,120 +180,135 @@ onMounted(load)
   <div>
     <div class="mb-6 flex flex-wrap items-end justify-between gap-4">
       <div>
-        <h1 class="font-display text-3xl text-banten-navy">Dashboard Eksekutif</h1>
-        <p class="mt-1 text-sm text-banten-navy/65">
-          F.14 — Ringkasan krisis, diseminasi, ASN & KOL untuk pimpinan
-        </p>
+        <p class="text-[11px] font-semibold uppercase tracking-[0.18em] text-emerald-300/80">F.14</p>
+        <h1 class="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">Dashboard Eksekutif</h1>
+        <p class="mt-1 text-sm text-[#8b949e]">Ringkasan krisis, validasi, ASN, dan KOL untuk pimpinan</p>
       </div>
       <button
         type="button"
-        class="rounded-md border border-banten-navy/20 px-3 py-1.5 text-xs text-banten-navy hover:bg-white"
+        class="rounded-xl border border-[#30363d] bg-[#161b22] px-3 py-1.5 text-xs font-semibold text-[#c9d1d9] hover:border-emerald-500/40 hover:text-white"
         @click="load"
       >
-        Refresh
+        Muat ulang
       </button>
     </div>
 
-    <div v-if="loading" class="text-sm text-banten-navy/60">Memuat ringkasan...</div>
+    <PageLoader v-if="!reveal" title="Memuat ringkasan" :done="!loading" @finished="reveal = true" />
     <div v-else-if="error" class="rounded-md border border-banten-red/30 bg-red-50 px-4 py-3 text-sm text-banten-red">
       {{ error }}
     </div>
 
     <template v-else-if="data">
       <!-- Executive brief -->
-      <section class="exec-brief mb-6 rounded-xl border border-banten-gold/40 bg-gradient-to-br from-white to-amber-50/60 p-5">
-        <p class="text-xs font-semibold tracking-wide text-banten-gold uppercase">Executive Brief</p>
-        <h2 class="mt-2 font-display text-2xl text-banten-navy">
+      <section class="relative mb-6 overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] p-5">
+        <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-400/90 to-transparent" />
+        <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-300">Ringkasan untuk pimpinan</p>
+        <h2 class="mt-2 text-xl font-semibold leading-snug text-white sm:text-2xl">
           {{ data.executive_brief.headline }}
         </h2>
-        <p class="mt-2 text-sm text-banten-navy/75">{{ data.executive_brief.summary }}</p>
-        <ul class="mt-3 list-disc space-y-1 pl-5 text-sm text-banten-navy/70">
-          <li v-for="(rec, i) in data.executive_brief.recommendations" :key="i">{{ rec }}</li>
+        <p class="mt-2 max-w-3xl text-sm leading-relaxed text-[#c9d1d9]">{{ data.executive_brief.summary }}</p>
+        <ul class="mt-4 space-y-2">
+          <li
+            v-for="(rec, i) in data.executive_brief.recommendations"
+            :key="i"
+            class="rounded-xl border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#c9d1d9]"
+          >
+            {{ i + 1 }}. {{ rec }}
+          </li>
         </ul>
       </section>
 
-      <!-- KPIs -->
-      <section class="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <div class="rounded-xl border border-banten-navy/10 bg-white/80 px-4 py-4">
-          <p class="text-xs text-banten-navy/55">Isu aktif</p>
-          <p class="mt-1 font-display text-3xl text-banten-navy">{{ kpis.active_issues }}</p>
-          <p class="text-xs text-banten-red">{{ kpis.critical_issues }} kritis (R3+)</p>
-        </div>
-        <div class="rounded-xl border border-banten-navy/10 bg-white/80 px-4 py-4">
-          <p class="text-xs text-banten-navy/55">Validasi OPD</p>
-          <p class="mt-1 font-display text-3xl text-banten-navy">{{ kpis.waiting_validations }}</p>
-          <p class="text-xs text-banten-navy/50">menunggu respon</p>
-        </div>
-        <div class="rounded-xl border border-banten-navy/10 bg-white/80 px-4 py-4">
-          <p class="text-xs text-banten-navy/55">Blast 7 hari</p>
-          <p class="mt-1 font-display text-3xl text-banten-navy">{{ kpis.blasts_7d }}</p>
-          <p class="text-xs text-banten-navy/50">{{ formatNum(kpis.blast_deliveries_7d) }} delivery</p>
-        </div>
-        <div class="rounded-xl border border-banten-navy/10 bg-white/80 px-4 py-4">
-          <p class="text-xs text-banten-navy/55">Partisipasi ASN</p>
-          <p class="mt-1 font-display text-3xl text-banten-navy">{{ formatNum(kpis.asn_participations) }}</p>
-          <p class="text-xs text-banten-navy/50">{{ kpis.active_missions }} misi aktif</p>
-        </div>
-        <div class="rounded-xl border border-banten-navy/10 bg-white/80 px-4 py-4">
-          <p class="text-xs text-banten-navy/55">Reach KOL</p>
-          <p class="mt-1 font-display text-3xl text-banten-navy">{{ formatNum(kpis.kol_views) }}</p>
-          <p class="text-xs text-banten-navy/50">{{ kpis.kol_campaigns }} campaign</p>
-        </div>
+      <section class="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+        <article class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] px-4 py-4">
+          <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-rose-400/90 to-transparent" />
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Isu aktif</p>
+          <p class="mt-2 text-3xl font-semibold text-white">{{ kpis.active_issues }}</p>
+          <p class="mt-1 text-xs text-rose-300">{{ kpis.critical_issues }} berisiko R3 ke atas</p>
+        </article>
+        <article class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] px-4 py-4">
+          <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-amber-400/90 to-transparent" />
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Validasi OPD</p>
+          <p class="mt-2 text-3xl font-semibold text-white">{{ kpis.waiting_validations }}</p>
+          <p class="mt-1 text-xs text-[#6e7681]">Menunggu jawaban</p>
+        </article>
+        <article class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] px-4 py-4">
+          <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-sky-400/90 to-transparent" />
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Blast 7 hari</p>
+          <p class="mt-2 text-3xl font-semibold text-white">{{ kpis.blasts_7d }}</p>
+          <p class="mt-1 text-xs text-[#6e7681]">{{ formatNum(kpis.blast_deliveries_7d) }} pengiriman</p>
+        </article>
+        <article class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] px-4 py-4">
+          <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-emerald-400/90 to-transparent" />
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Partisipasi ASN</p>
+          <p class="mt-2 text-3xl font-semibold text-white">{{ formatNum(kpis.asn_participations) }}</p>
+          <p class="mt-1 text-xs text-[#6e7681]">{{ kpis.active_missions }} misi berjalan</p>
+        </article>
+        <article class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22] px-4 py-4">
+          <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-violet-400/90 to-transparent" />
+          <p class="text-[11px] font-semibold uppercase tracking-wide text-[#8b949e]">Jangkauan KOL</p>
+          <p class="mt-2 text-3xl font-semibold text-white">{{ formatNum(kpis.kol_views) }}</p>
+          <p class="mt-1 text-xs text-[#6e7681]">{{ kpis.kol_campaigns }} kampanye</p>
+        </article>
       </section>
 
       <!-- Charts -->
       <section class="mb-6 grid gap-4 lg:grid-cols-3">
-        <div class="rounded-xl border border-banten-navy/10 bg-white/80 p-4 lg:col-span-1">
-          <h3 class="font-display text-lg text-banten-navy">Distribusi Risiko</h3>
+        <div class="rounded-2xl border border-[#30363d] bg-[#161b22] p-4 lg:col-span-1">
+          <h3 class="text-base font-semibold text-white">Distribusi risiko</h3>
+          <p class="mt-1 text-xs text-[#8b949e]">Jumlah isu menurut tingkat R0–R5.</p>
           <div class="mt-3 h-48">
             <Bar :data="riskChart" :options="riskChartOptions" />
           </div>
-          <div class="mt-3 border-t border-banten-navy/10 pt-3">
-            <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-banten-navy/45">
+          <div class="mt-3 border-t border-[#30363d] pt-3">
+            <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-[#6e7681]">
               Keterangan R0–R5
             </p>
             <RiskLegend compact />
           </div>
         </div>
-        <div class="rounded-xl border border-banten-navy/10 bg-white/80 p-4 lg:col-span-1">
-          <h3 class="font-display text-lg text-banten-navy">Pipeline Konten</h3>
+        <div class="rounded-2xl border border-[#30363d] bg-[#161b22] p-4 lg:col-span-1">
+          <h3 class="text-base font-semibold text-white">Pipeline konten</h3>
+          <p class="mt-1 text-xs text-[#8b949e]">Posisi naskah dari draf sampai terbit.</p>
           <div class="mt-3 h-56">
             <Doughnut v-if="contentChart.labels.length" :data="contentChart" :options="doughnutOptions" />
-            <p v-else class="pt-16 text-center text-sm text-banten-navy/50">Belum ada konten</p>
+            <p v-else class="pt-16 text-center text-sm text-[#8b949e]">Belum ada konten</p>
           </div>
         </div>
-        <div class="rounded-xl border border-banten-navy/10 bg-white/80 p-4 lg:col-span-1">
-          <h3 class="font-display text-lg text-banten-navy">ASN per OPD</h3>
+        <div class="rounded-2xl border border-[#30363d] bg-[#161b22] p-4 lg:col-span-1">
+          <h3 class="text-base font-semibold text-white">ASN per OPD</h3>
+          <p class="mt-1 text-xs text-[#8b949e]">Partisipasi aparatur menurut perangkat daerah.</p>
           <div class="mt-3 h-56">
             <Bar v-if="asnChart.labels.length" :data="asnChart" :options="chartOptions" />
-            <p v-else class="pt-16 text-center text-sm text-banten-navy/50">Belum ada partisipasi</p>
+            <p v-else class="pt-16 text-center text-sm text-[#8b949e]">Belum ada partisipasi</p>
           </div>
         </div>
       </section>
 
       <!-- Critical issues -->
-      <section class="rounded-xl border border-banten-navy/10 bg-white/80 p-5">
+      <section class="rounded-2xl border border-[#30363d] bg-[#161b22] p-5">
         <div class="flex items-center justify-between gap-3">
-          <h3 class="font-display text-lg text-banten-navy">Isu Prioritas (R3+)</h3>
-          <RouterLink to="/crisis-room" class="text-xs text-banten-gold hover:underline">Crisis Room →</RouterLink>
+          <div>
+            <h3 class="text-base font-semibold text-white">Isu prioritas</h3>
+            <p class="mt-1 text-xs text-[#8b949e]">Isu aktif pada tingkat R3 ke atas.</p>
+          </div>
+          <RouterLink to="/crisis-room" class="text-xs font-semibold text-emerald-300 hover:text-emerald-200">Crisis Room</RouterLink>
         </div>
-        <div v-if="!data.critical_issues?.length" class="mt-4 text-sm text-banten-navy/60">
-          Tidak ada isu kritis aktif.
+        <div v-if="!data.critical_issues?.length" class="mt-4 rounded-xl border border-dashed border-[#30363d] px-4 py-8 text-center text-sm text-[#8b949e]">
+          Tidak ada isu kritis yang masih ditangani.
         </div>
         <ul v-else class="mt-4 space-y-2">
-          <li
-            v-for="issue in data.critical_issues"
-            :key="issue.id"
-          >
+          <li v-for="issue in data.critical_issues" :key="issue.id">
             <RouterLink
               :to="`/issues/${issue.id}`"
-              class="flex flex-wrap items-center justify-between gap-2 rounded-md border border-banten-navy/10 px-3 py-3 text-sm hover:border-banten-gold/40"
+              class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#30363d] bg-[#0d1117] px-4 py-3 transition hover:border-emerald-500/35"
             >
-              <div>
-                <RiskBadge :level="issue.risk_level" show-label />
-                <span class="ml-2 font-medium text-banten-navy">{{ issue.title }}</span>
+              <div class="min-w-0">
+                <p class="text-sm font-semibold leading-snug text-white">{{ issue.title }}</p>
+                <div class="mt-2">
+                  <RiskBadge :level="issue.risk_level" show-label tone="outline" />
+                </div>
               </div>
-              <IssueStatusBadge :status="issue.status" />
+              <IssueStatusBadge :status="issue.status" tone="outline" />
             </RouterLink>
           </li>
         </ul>

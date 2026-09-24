@@ -22,17 +22,37 @@ const filters = ref({
   q: '',
   role_code: '',
   active: '',
+  opd_id: '',
+  sort_by: 'created_at',
+  sort_dir: 'desc',
 })
 
 const opdOptions = computed(() =>
   opds.value.map((o) => ({ value: o.id, label: o.name })),
 )
 
+const filterOpdOptions = computed(() => [
+  { value: '', label: 'Semua OPD' },
+  ...opdOptions.value,
+])
+
+const sortOptions = [
+  { value: 'created_at', label: 'Terbaru dibuat' },
+  { value: 'full_name', label: 'Nama' },
+  { value: 'username', label: 'Username' },
+  { value: 'email', label: 'Email' },
+  { value: 'phone', label: 'No. HP' },
+  { value: 'role', label: 'Role' },
+  { value: 'opd_name', label: 'OPD' },
+  { value: 'is_active', label: 'Status' },
+]
+
 const form = ref({
   username: '',
   email: '',
   password: '',
   full_name: '',
+  phone: '',
   role_code: 'editor',
   opd_id: '',
   is_active: true,
@@ -49,6 +69,7 @@ function resetForm() {
     email: '',
     password: '',
     full_name: '',
+    phone: '',
     role_code: 'editor',
     opd_id: '',
     is_active: true,
@@ -86,7 +107,25 @@ function applyFilters() {
 }
 
 function resetFilters() {
-  filters.value = { q: '', role_code: '', active: '' }
+  filters.value = {
+    q: '',
+    role_code: '',
+    active: '',
+    opd_id: '',
+    sort_by: 'created_at',
+    sort_dir: 'desc',
+  }
+  page.value = 1
+  load()
+}
+
+function onSortChange() {
+  page.value = 1
+  load()
+}
+
+function toggleSortDir() {
+  filters.value.sort_dir = filters.value.sort_dir === 'asc' ? 'desc' : 'asc'
   page.value = 1
   load()
 }
@@ -103,6 +142,7 @@ function editUser(user) {
     email: user.email,
     password: '',
     full_name: user.full_name,
+    phone: user.phone || '',
     role_code: user.role?.code || 'editor',
     opd_id: user.opd_id || '',
     is_active: user.is_active,
@@ -122,6 +162,7 @@ async function save() {
     if (editingId.value) {
       const payload = {
         full_name: form.value.full_name,
+        phone: form.value.phone,
         email: form.value.email,
         role_code: form.value.role_code,
         is_active: form.value.is_active,
@@ -139,6 +180,7 @@ async function save() {
         email: form.value.email,
         password: form.value.password,
         full_name: form.value.full_name,
+        phone: form.value.phone || null,
         role_code: form.value.role_code,
         opd_id: form.value.opd_id ? Number(form.value.opd_id) : null,
       })
@@ -188,13 +230,13 @@ onMounted(load)
       class="mb-6 rounded-xl border border-banten-navy/10 bg-white/90 p-4"
       @submit.prevent="applyFilters"
     >
-      <div class="grid gap-3 md:grid-cols-4">
-        <div class="md:col-span-2">
+      <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+        <div class="md:col-span-2 lg:col-span-3">
           <label class="text-xs font-medium text-banten-navy/70">Kata kunci</label>
           <input
             v-model="filters.q"
             type="search"
-            placeholder="Nama, username, email, OPD..."
+            placeholder="Nama, username, email, no HP, OPD..."
             class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
           />
         </div>
@@ -212,6 +254,38 @@ onMounted(load)
             <option value="1">Aktif</option>
             <option value="0">Nonaktif</option>
           </select>
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">OPD</label>
+          <SearchableSelect
+            v-model="filters.opd_id"
+            tone="dark"
+            :options="filterOpdOptions"
+            placeholder="Semua OPD"
+            search-placeholder="Cari OPD..."
+          />
+        </div>
+        <div>
+          <label class="text-xs font-medium text-banten-navy/70">Urutkan</label>
+          <div class="mt-1 flex gap-2">
+            <select
+              v-model="filters.sort_by"
+              class="w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+              @change="onSortChange"
+            >
+              <option v-for="opt in sortOptions" :key="opt.value" :value="opt.value">
+                {{ opt.label }}
+              </option>
+            </select>
+            <button
+              type="button"
+              class="shrink-0 rounded-md border border-banten-navy/20 px-3 py-2 text-xs font-semibold text-banten-navy hover:bg-banten-sand/50"
+              :title="filters.sort_dir === 'asc' ? 'Naik (A→Z)' : 'Turun (Z→A)'"
+              @click="toggleSortDir"
+            >
+              {{ filters.sort_dir === 'asc' ? '↑ Asc' : '↓ Desc' }}
+            </button>
+          </div>
         </div>
       </div>
       <div class="mt-4 flex flex-wrap gap-2">
@@ -244,6 +318,16 @@ onMounted(load)
           <input
             v-model="form.full_name"
             required
+            class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label class="text-sm font-medium text-banten-navy">No. HP</label>
+          <input
+            v-model="form.phone"
+            type="tel"
+            inputmode="tel"
+            placeholder="08xxxxxxxxxx"
             class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
           />
         </div>
@@ -325,6 +409,7 @@ onMounted(load)
           </label>
           <SearchableSelect
             v-model="form.opd_id"
+            tone="dark"
             :options="opdOptions"
             placeholder="— pilih OPD —"
             search-placeholder="Cari OPD..."
@@ -355,6 +440,7 @@ onMounted(load)
         <thead class="border-b border-banten-navy/10 bg-banten-sand/40 text-xs uppercase tracking-wide text-banten-navy/60">
           <tr>
             <th class="px-4 py-3 font-medium">User</th>
+            <th class="px-4 py-3 font-medium">No. HP</th>
             <th class="px-4 py-3 font-medium">Role</th>
             <th class="px-4 py-3 font-medium">OPD</th>
             <th class="px-4 py-3 font-medium">Status</th>
@@ -371,6 +457,7 @@ onMounted(load)
               <p class="font-medium text-banten-navy">{{ u.full_name }}</p>
               <p class="text-xs text-banten-navy/50">@{{ u.username }} · {{ u.email }}</p>
             </td>
+            <td class="px-4 py-3 text-banten-navy/70">{{ u.phone || '—' }}</td>
             <td class="px-4 py-3">
               <span class="rounded bg-banten-navy/8 px-2 py-0.5 text-xs font-medium text-banten-navy">
                 {{ u.role?.name || '—' }}

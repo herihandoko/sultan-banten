@@ -1,7 +1,8 @@
-"""Crisis Room issue endpoints."""
+from datetime import datetime, timedelta, timezone
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_jwt_extended import jwt_required
+from sqlalchemy.orm import selectinload
 
 from app.extensions import db
 from app.models import AuditLog, Issue, IssueEvidence
@@ -23,6 +24,20 @@ def _exclude_seed_demos(query):
     )
 
 
+def _parse_days_lookback():
+    """Optional period filter: days=1|3|7|30 (Asia/Jakarta lookback from now)."""
+    raw = (request.args.get("days") or "").strip()
+    if not raw:
+        return None
+    try:
+        days = int(raw)
+    except ValueError:
+        return None
+    if days not in {1, 3, 7, 30}:
+        return None
+    return days
+
+
 # Allow OPD to list issues they are validating (via validation assignment)
 @bp.get("")
 @jwt_required()
@@ -34,12 +49,23 @@ def list_issues():
     q = (request.args.get("q") or "").strip()
     include_demo = (request.args.get("include_demo") or "0").lower() in {"1", "true", "yes"}
     do_sync = (request.args.get("sync") or "1").lower() not in {"0", "false", "no"}
+    days = _parse_days_lookback()
     project_id = request_project_id()
     sync_meta = None
 
     if do_sync:
         try:
-            sync_meta = sync_sipantau_crises(project_id)
+            from app.services.app_settings import get_news_source
+
+            if get_news_source() == "sipantau":
+                sync_meta = sync_sipantau_crises(project_id)
+            else:
+                sync_meta = {
+                    "candidates": 0,
+                    "pushed": 0,
+                    "skipped": True,
+                    "reason": "news_source=mata_bathin",
+                }
         except Exception as exc:  # noqa: BLE001 — never block Crisis Room listing
             current_app.logger.warning("crisis sync skipped: %s", exc)
             sync_meta = {"error": str(exc), "candidates": 0, "pushed": 0}
@@ -65,6 +91,10 @@ def list_issues():
     if not include_demo:
         query = _exclude_seed_demos(query)
 
+    if days:
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        query = query.filter(Issue.created_at >= since)
+
     if status:
         query = query.filter_by(status=status)
     if risk_level:
@@ -80,11 +110,55 @@ def list_issues():
                 Issue.mb_alert_id.ilike(like),
             )
         )
-    query = query.order_by(Issue.created_at.desc())
+
+    # Summary over filtered set (before order/options/pagination)
+    risk_counts = {f"R{i}": 0 for i in range(6)}
+    open_count = 0
+    try:
+        from sqlalchemy import func
+
+        for level, cnt in (
+            query.with_entities(Issue.risk_level, func.count(Issue.id))
+            .group_by(Issue.risk_level)
+            .all()
+        ):
+            key = str(level or "").upper()
+            if key in risk_counts:
+                risk_counts[key] = int(cnt or 0)
+        open_count = int(
+            query.filter(Issue.status == "open").with_entities(func.count(Issue.id)).scalar() or 0
+        )
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.warning("issue summary skipped: %s", exc)
+
+    sort_by = (request.args.get("sort_by") or "created_at").strip().lower()
+    sort_dir = (request.args.get("sort_dir") or "desc").strip().lower()
+    if sort_dir not in {"asc", "desc"}:
+        sort_dir = "desc"
+    sort_map = {
+        "created_at": Issue.created_at,
+        "updated_at": Issue.updated_at,
+        "title": Issue.title,
+        "status": Issue.status,
+        "risk": Issue.risk_level,
+        "risk_level": Issue.risk_level,
+    }
+    # Risk R0..R5 sorts alphabetically already (R0 < R1 < … < R5)
+    col = sort_map.get(sort_by, Issue.created_at)
+    order_expr = col.asc() if sort_dir == "asc" else col.desc()
+    query = query.options(selectinload(Issue.evidence)).order_by(order_expr, Issue.id.desc())
+
     payload = paginate(query, lambda i: i.to_dict())
     if sync_meta is not None:
         payload["sipantau_sync"] = sync_meta
     payload["include_demo"] = include_demo
+    if days:
+        payload["days"] = days
+    payload["summary"] = {
+        "open": open_count,
+        "elevated": risk_counts["R3"] + risk_counts["R4"] + risk_counts["R5"],
+        "by_risk": risk_counts,
+    }
     return jsonify(payload)
 
 
@@ -215,3 +289,25 @@ def update_issue_status(issue_id: int):
             "reason": feedback_result.get("reason"),
         }
     return jsonify({"data": payload})
+
+
+@bp.delete("/<int:issue_id>")
+@jwt_required()
+@role_required("super_admin", "editor")
+def delete_issue(issue_id: int):
+    issue = Issue.query.get_or_404(issue_id)
+    user = get_current_user()
+    title = issue.title
+    db.session.add(
+        AuditLog(
+            user_id=user.id if user else None,
+            action="delete_issue",
+            entity_type="issue",
+            entity_id=issue.id,
+            details={"title": title, "source": issue.source},
+            ip_address=request.remote_addr,
+        )
+    )
+    db.session.delete(issue)
+    db.session.commit()
+    return jsonify({"ok": True, "id": issue_id})

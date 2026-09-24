@@ -68,6 +68,36 @@ async function download(code, format) {
 }
 
 onMounted(load)
+
+const REPORT_META = {
+  crisis: {
+    hint: 'Kronologi isu, validasi OPD, naskah klarifikasi, dan keputusan pimpinan.',
+    accent: 'from-rose-500/80',
+  },
+  media_sla: {
+    hint: 'Kepatuhan mitra media terhadap target waktu tayang dan riwayat blast.',
+    accent: 'from-sky-500/80',
+  },
+  asn: {
+    hint: 'Jumlah partisipasi ASN per OPD pada mission board.',
+    accent: 'from-emerald-500/80',
+  },
+  kol: {
+    hint: 'Kontrak, campaign, dan metrik tayangan key opinion leader.',
+    accent: 'from-violet-500/80',
+  },
+  executive: {
+    hint: 'Ringkasan untuk pimpinan: isu aktif, tingkat risiko, dan progres penanganan.',
+    accent: 'from-amber-400/80',
+  },
+}
+
+function reportMeta(code) {
+  return REPORT_META[code] || {
+    hint: 'Unduh rekap dalam PDF atau Excel.',
+    accent: 'from-slate-400/80',
+  }
+}
 </script>
 
 <template>
@@ -84,41 +114,61 @@ onMounted(load)
       {{ error }}
     </div>
 
-    <div class="mb-5 rounded-xl border border-banten-navy/10 bg-white/90 p-4">
-      <label class="text-sm font-medium text-banten-navy">Filter isu (opsional, untuk laporan krisis)</label>
-      <input
-        v-model="issueId"
-        type="number"
-        min="1"
-        placeholder="ID isu"
-        class="mt-1 w-full max-w-xs rounded-md border border-banten-navy/20 px-3 py-2 text-sm"
-      />
-    </div>
-
     <div class="grid gap-4 md:grid-cols-2">
       <article
         v-for="t in visibleTypes"
         :key="t.code"
-        class="rounded-xl border border-banten-navy/10 bg-white/90 p-5"
+        class="relative flex flex-col overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22]"
       >
-        <h2 class="font-display text-xl text-banten-navy">{{ t.name }}</h2>
-        <p class="mt-1 text-xs uppercase tracking-wide text-banten-navy/45">{{ t.code }}</p>
-        <div class="mt-4 flex flex-wrap gap-2">
+        <div
+          class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent"
+          :class="reportMeta(t.code).accent"
+          aria-hidden="true"
+        />
+        <div class="px-5 py-4 pl-6">
+          <div class="flex items-start justify-between gap-3">
+            <h2 class="text-base font-semibold leading-snug text-white sm:text-lg">{{ t.name }}</h2>
+            <span class="shrink-0 rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#8b949e]">
+              {{ t.code }}
+            </span>
+          </div>
+          <p class="mt-2 text-sm leading-relaxed text-[#8b949e]">{{ reportMeta(t.code).hint }}</p>
+          <div class="mt-3 flex flex-wrap gap-2">
+            <span
+              v-for="fmt in t.formats || ['pdf', 'xlsx']"
+              :key="fmt"
+              class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold uppercase text-[#c9d1d9]"
+            >
+              {{ fmt }}
+            </span>
+          </div>
+          <label v-if="t.code === 'crisis'" class="mt-4 block text-[11px] font-medium text-[#8b949e]">
+            Batasi ke satu isu (opsional)
+            <input
+              v-model="issueId"
+              type="number"
+              min="1"
+              placeholder="ID isu"
+              class="mt-1 w-full max-w-xs rounded-xl border border-[#30363d] bg-[#0d1117] px-3 py-2 text-sm text-[#e6edf3] outline-none placeholder:text-[#6e7681] focus:border-emerald-500/50"
+            />
+          </label>
+        </div>
+        <div class="mt-auto flex gap-4 border-t border-[#30363d]/80 px-5 py-2.5 pl-6 text-xs font-semibold">
           <button
             type="button"
-            class="rounded-md bg-banten-navy px-3 py-2 text-xs text-white disabled:opacity-60"
+            class="text-emerald-300 hover:text-emerald-200 disabled:opacity-60"
             :disabled="busy === `${t.code}-pdf`"
             @click="download(t.code, 'pdf')"
           >
-            {{ busy === `${t.code}-pdf` ? '...' : 'PDF' }}
+            {{ busy === `${t.code}-pdf` ? 'Menyiapkan PDF...' : 'Unduh PDF' }}
           </button>
           <button
             type="button"
-            class="rounded-md border border-banten-navy/20 px-3 py-2 text-xs text-banten-navy hover:bg-banten-sand disabled:opacity-60"
+            class="text-sky-300 hover:text-sky-200 disabled:opacity-60"
             :disabled="busy === `${t.code}-xlsx`"
             @click="download(t.code, 'xlsx')"
           >
-            {{ busy === `${t.code}-xlsx` ? '...' : 'Excel' }}
+            {{ busy === `${t.code}-xlsx` ? 'Menyiapkan Excel...' : 'Unduh Excel' }}
           </button>
         </div>
       </article>

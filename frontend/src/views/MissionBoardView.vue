@@ -51,10 +51,36 @@ const actionLabel = {
   like_share_comment: 'Like · Share · Comment',
 }
 
-const statusColor = {
-  active: 'bg-emerald-100 text-emerald-800',
-  completed: 'bg-sky-100 text-sky-800',
-  cancelled: 'bg-slate-200 text-slate-600',
+const STATUS_META = {
+  active: { label: 'Aktif', chip: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300', accent: 'from-emerald-500/80' },
+  completed: { label: 'Selesai', chip: 'border-sky-500/40 bg-sky-500/10 text-sky-300', accent: 'from-sky-500/80' },
+  cancelled: { label: 'Dibatalkan', chip: 'border-slate-500/40 bg-slate-500/10 text-slate-300', accent: 'from-slate-500/80' },
+}
+
+function statusOf(mission) {
+  return STATUS_META[mission.status] || { label: mission.status, chip: 'border-[#30363d] text-[#c9d1d9]', accent: 'from-slate-500/80' }
+}
+
+function progressOf(mission) {
+  const done = mission.participation_count || 0
+  const target = mission.target_count || 0
+  if (!target) return 0
+  return Math.min(100, Math.round((done / target) * 100))
+}
+
+function formatDateTime(iso) {
+  if (!iso) return ''
+  const normalized = /[zZ]|[+-]\d{2}:\d{2}$/.test(iso) ? iso : `${iso}Z`
+  const d = new Date(normalized)
+  if (Number.isNaN(d.getTime())) return iso
+  return d.toLocaleString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }) + ' WIB'
 }
 
 async function load() {
@@ -331,47 +357,51 @@ onMounted(load)
         <article
           v-for="m in missions"
           :key="m.id"
-          class="rounded-xl border border-banten-navy/10 bg-white/80 px-5 py-4"
+          class="relative overflow-hidden rounded-2xl border border-[#30363d] bg-[#161b22]"
         >
-          <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="min-w-0 flex-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="statusColor[m.status]">
-                  {{ m.status }}
-                </span>
-                <span class="text-xs text-banten-navy/50">{{ actionLabel[m.action_type] || m.action_type }}</span>
-              </div>
-              <h2 class="mt-2 font-display text-xl text-banten-navy">{{ m.title }}</h2>
-              <p class="mt-2 whitespace-pre-wrap text-sm text-banten-navy/75">{{ m.instruction }}</p>
-              <a
-                v-if="m.target_url"
-                :href="m.target_url"
-                target="_blank"
-                rel="noopener"
-                class="mt-2 inline-block text-sm text-banten-gold hover:underline"
-              >
-                Buka tautan target →
-              </a>
-              <p class="mt-2 text-xs text-banten-navy/55">
-                Partisipasi: {{ m.participation_count || 0 }}
-                <span v-if="m.target_count"> / {{ m.target_count }}</span>
-              </p>
+          <div class="absolute inset-y-0 left-0 w-1 bg-gradient-to-b to-transparent" :class="statusOf(m).accent" aria-hidden="true" />
+          <div class="px-5 py-4 pl-6">
+            <div class="flex items-start justify-between gap-3">
+              <h2 class="text-base font-semibold leading-snug text-white sm:text-lg">{{ m.title }}</h2>
+              <span class="shrink-0 rounded-md border px-2 py-0.5 text-[11px] font-semibold" :class="statusOf(m).chip">
+                {{ statusOf(m).label }}
+              </span>
             </div>
-            <div v-if="canCreate && m.status === 'active'" class="flex gap-2 text-xs">
-              <button type="button" class="rounded border border-banten-navy/20 px-2 py-1 text-banten-navy" @click="setStatus(m, 'completed')">
-                Selesai
-              </button>
-              <button type="button" class="rounded border border-banten-red/30 px-2 py-1 text-banten-red" @click="setStatus(m, 'cancelled')">
-                Batalkan
-              </button>
+            <div class="mt-2 flex flex-wrap gap-2">
+              <span class="rounded-md border border-[#30363d] bg-[#0d1117] px-2 py-0.5 text-[10px] font-semibold text-[#c9d1d9]">
+                {{ actionLabel[m.action_type] || m.action_type }}
+              </span>
+              <span class="text-[11px] text-[#8b949e]">
+                {{ m.participation_count || 0 }}<span v-if="m.target_count"> / {{ m.target_count }}</span> partisipasi
+              </span>
             </div>
+            <div v-if="m.target_count" class="mt-2 h-1.5 overflow-hidden rounded-full bg-[#30363d]">
+              <div class="h-full rounded-full bg-emerald-400" :style="{ width: `${progressOf(m)}%` }" />
+            </div>
+            <p class="mt-2 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-[#8b949e]">{{ m.instruction }}</p>
+            <a
+              v-if="m.target_url"
+              :href="m.target_url"
+              target="_blank"
+              rel="noopener"
+              class="mt-2 inline-flex text-xs font-semibold text-sky-300 hover:text-emerald-300"
+            >
+              Buka tautan target
+            </a>
+          </div>
+          <div
+            v-if="canCreate && m.status === 'active'"
+            class="flex gap-4 border-t border-[#30363d]/80 px-5 py-2.5 pl-6 text-xs font-semibold"
+          >
+            <button type="button" class="text-emerald-300 hover:text-emerald-200" @click="setStatus(m, 'completed')">Selesai</button>
+            <button type="button" class="text-rose-300 hover:text-rose-200" @click="setStatus(m, 'cancelled')">Batalkan</button>
           </div>
 
           <div
             v-if="canJoin && m.status === 'active' && !m.joined"
-            class="mt-4 rounded-lg border border-banten-navy/10 bg-banten-sand/40 p-4"
+            class="mx-5 mb-4 ml-6 rounded-xl border border-[#30363d] bg-[#0d1117] p-4"
           >
-            <p class="text-sm font-medium text-banten-navy">Catat partisipasi Anda</p>
+            <p class="text-sm font-medium text-white">Catat partisipasi Anda</p>
             <div class="mt-2 grid gap-2 md:grid-cols-2">
               <input
                 :value="joinForm[m.id]?.proof_url || ''"
@@ -396,17 +426,17 @@ onMounted(load)
               {{ joiningId === m.id ? 'Menyimpan...' : 'Saya Sudah Amplifikasi' }}
             </button>
           </div>
-          <p v-else-if="m.joined" class="mt-3 text-sm text-emerald-700">✓ Anda sudah berpartisipasi</p>
+          <p v-else-if="m.joined" class="mx-5 mb-4 ml-6 text-sm text-emerald-300">Anda sudah berpartisipasi.</p>
 
-          <details v-if="m.participations?.length" class="mt-3">
-            <summary class="cursor-pointer text-xs text-banten-gold">
-              Lihat log partisipasi ({{ m.participations.length }})
+          <details v-if="m.participations?.length" class="mx-5 mb-4 ml-6">
+            <summary class="cursor-pointer text-xs font-semibold text-emerald-300">
+              Log partisipasi ({{ m.participations.length }})
             </summary>
-            <ul class="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-banten-navy/70">
+            <ul class="mt-2 max-h-40 space-y-1 overflow-y-auto text-xs text-[#c9d1d9]">
               <li v-for="p in m.participations" :key="p.id">
                 {{ p.user_name || `User #${p.user_id}` }}
                 <span v-if="p.opd_name"> · {{ p.opd_name }}</span>
-                · {{ p.completed_at }}
+                · {{ formatDateTime(p.completed_at) }}
               </li>
             </ul>
           </details>
