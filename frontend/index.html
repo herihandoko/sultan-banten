@@ -1,7 +1,16 @@
 <!doctype html>
-<html lang="id">
+<html lang="id" class="dark" style="color-scheme: dark">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      try {
+        var saved = localStorage.getItem('sb-theme')
+        if (saved === 'light' || saved === '"light"') {
+          document.documentElement.classList.remove('dark')
+          document.documentElement.style.colorScheme = 'light'
+        }
+      } catch (e) {}
+    </script>
     <link rel="icon" type="image/png" href="/pavicon.png" />
     <link rel="apple-touch-icon" href="/pavicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

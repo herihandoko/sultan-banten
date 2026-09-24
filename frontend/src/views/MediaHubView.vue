@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import PaginationBar from '../components/PaginationBar.vue'
+import SearchableSelect from '../components/SearchableSelect.vue'
 
 const auth = useAuthStore()
 const tab = ref('partners') // partners | blast | logs | sla
@@ -74,6 +75,12 @@ const canManage = computed(() =>
 
 const activePartnerCount = computed(() => partnersAll.value.length)
 const readyCount = computed(() => readyContent.value.length)
+const contentOptions = computed(() =>
+  readyContent.value.map((c) => ({
+    value: String(c.id),
+    label: `${c.title} · ${c.issue_title || `Isu #${c.issue_id}`}`,
+  })),
+)
 const blastTotal = computed(() => blastsMeta.value?.total || 0)
 const slaAverage = computed(() => {
   const rows = slaRanking.value.filter((row) => row.compliance_rate != null)
@@ -583,12 +590,15 @@ onMounted(load)
           </p>
 
           <label class="mt-4 block text-[11px] font-medium text-[#8b949e]">Konten approved</label>
-          <select v-model="blastForm.content_id" required :class="inputClass">
-            <option v-if="!readyContent.length" value="" disabled>Tidak ada konten approved</option>
-            <option v-for="c in readyContent" :key="c.id" :value="c.id">
-              {{ c.title }} · {{ c.issue_title || `Isu #${c.issue_id}` }}
-            </option>
-          </select>
+          <SearchableSelect
+            v-model="blastForm.content_id"
+            tone="dark"
+            required
+            :disabled="!readyContent.length"
+            :options="contentOptions"
+            :placeholder="readyContent.length ? 'Pilih konten approved' : 'Tidak ada konten approved'"
+            search-placeholder="Cari judul konten atau isu…"
+          />
 
           <p class="mt-4 text-[11px] font-medium text-[#8b949e]">Kanal</p>
           <div class="mt-2 flex flex-wrap gap-2 text-sm">

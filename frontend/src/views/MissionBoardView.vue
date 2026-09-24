@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import api from '../services/api'
 import { useAuthStore } from '../stores/auth'
 import PaginationBar from '../components/PaginationBar.vue'
+import SearchableSelect from '../components/SearchableSelect.vue'
 import { riskOptionLabel } from '../config/risk'
 
 const auth = useAuthStore()
@@ -43,6 +44,13 @@ const canJoin = computed(() => ['super_admin', 'asn'].includes(role.value))
 const canViewStats = computed(() =>
   ['super_admin', 'editor', 'pimpinan', 'media_kol_admin'].includes(role.value),
 )
+const issueOptions = computed(() => [
+  { value: '', label: '— tidak terkait —' },
+  ...issues.value.map((issue) => ({
+    value: issue.id,
+    label: `${riskOptionLabel(issue.risk_level)} · ${issue.title}`,
+  })),
+])
 
 const actionLabel = {
   like: 'Like',
@@ -331,12 +339,13 @@ onMounted(load)
           </div>
           <div>
             <label class="text-sm font-medium text-banten-navy">Isu terkait (opsional)</label>
-            <select v-model="form.issue_id" class="mt-1 w-full rounded-md border border-banten-navy/20 px-3 py-2 text-sm">
-              <option value="">— tidak terkait —</option>
-              <option v-for="i in issues" :key="i.id" :value="i.id">
-                {{ riskOptionLabel(i.risk_level) }} · {{ i.title }}
-              </option>
-            </select>
+            <SearchableSelect
+              v-model="form.issue_id"
+              tone="dark"
+              :options="issueOptions"
+              placeholder="— tidak terkait —"
+              search-placeholder="Cari judul isu…"
+            />
           </div>
         </div>
         <p v-if="formError" class="mt-3 text-sm text-banten-red">{{ formError }}</p>

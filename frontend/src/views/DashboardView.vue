@@ -187,6 +187,53 @@ onMounted(load)
     </div>
 
     <template v-else-if="data">
+      <section
+        v-if="home?.content_queue"
+        class="mb-4 rounded-2xl border border-violet-500/35 bg-[#161b22] p-5"
+      >
+        <div class="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-300">Antrean editor</p>
+            <h2 class="mt-1 text-base font-semibold text-white">Siap dibuatkan konten</h2>
+            <p class="mt-1 text-xs text-[#8b949e]">
+              Berita yang baru diverifikasi OPD dan masih perlu ditindaklanjuti editor.
+            </p>
+          </div>
+          <span class="rounded-full border border-violet-400/40 bg-violet-400/15 px-3 py-1 text-sm font-semibold text-violet-200">
+            {{ home.content_queue_count || 0 }}
+          </span>
+        </div>
+        <ul v-if="home.content_queue.length" class="mt-4 space-y-2">
+          <li v-for="item in home.content_queue" :key="item.id">
+            <div class="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#30363d] bg-[#0d1117] px-4 py-3">
+              <RouterLink :to="item.href" class="min-w-0 flex-1">
+                <p class="line-clamp-2 text-sm font-semibold leading-snug text-white">{{ item.title }}</p>
+                <p class="mt-1 text-[11px] text-[#8b949e]">
+                  <span v-if="item.risk_level">{{ item.risk_level }} · </span>{{ item.meta }} · {{ item.ago }}
+                </p>
+                <p v-if="item.existing_label" class="mt-1 text-[11px] text-amber-200/90">{{ item.existing_label }}</p>
+              </RouterLink>
+              <div class="flex shrink-0 items-center gap-2">
+                <RouterLink
+                  v-if="item.existing_href"
+                  :to="item.existing_href"
+                  class="rounded-lg border border-[#30363d] px-3 py-2 text-xs font-semibold text-[#c9d1d9] transition hover:border-emerald-500/40 hover:text-white"
+                >
+                  Buka naskah
+                </RouterLink>
+                <RouterLink
+                  :to="item.create_href"
+                  class="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-semibold text-black transition hover:bg-emerald-400"
+                >
+                  Buat konten
+                </RouterLink>
+              </div>
+            </div>
+          </li>
+        </ul>
+        <p v-else class="mt-4 text-sm text-[#8b949e]">Belum ada berita yang menunggu konten.</p>
+      </section>
+
       <template v-if="isMonitor">
       <section class="mb-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <article class="rounded-2xl border border-[#30363d] bg-[#161b22] px-5 py-4">

@@ -41,4 +41,16 @@ class CrisisAlert(db.Model):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "read_at": self.read_at.isoformat() if self.read_at else None,
             "issue_title": self.issue.title if self.issue else None,
+            "href": self._href(),
         }
+
+    def _href(self) -> str | None:
+        if not self.issue_id:
+            return None
+        if self.alert_type == "content_ready":
+            return f"/konten?issue_id={self.issue_id}"
+        if self.alert_type == "content_review":
+            content_id = (self.delivery_status or {}).get("content_id")
+            if content_id:
+                return f"/konten/{content_id}"
+        return f"/issues/{self.issue_id}"

@@ -18,12 +18,19 @@ const savePending = ref(false)
 const editForm = ref({ title: '', body: '', media_url: '', content_type: 'text_release' })
 const reviewNotes = ref('')
 
-const statusColor = {
-  draft: 'bg-slate-200 text-slate-700',
-  in_review: 'bg-amber-100 text-amber-800',
-  approved: 'bg-emerald-100 text-emerald-800',
-  rejected: 'bg-red-100 text-red-800',
-  published: 'bg-sky-100 text-sky-800',
+const statusMeta = {
+  draft: { label: 'Draft', chip: 'border border-slate-500/40 bg-slate-500/10 text-slate-300' },
+  in_review: { label: 'Review', chip: 'border border-amber-500/40 bg-amber-500/10 text-amber-300' },
+  approved: { label: 'Disetujui', chip: 'border border-emerald-500/40 bg-emerald-500/10 text-emerald-300' },
+  rejected: { label: 'Ditolak', chip: 'border border-rose-500/40 bg-rose-500/10 text-rose-300' },
+  published: { label: 'Terbit', chip: 'border border-sky-500/40 bg-sky-500/10 text-sky-300' },
+}
+
+function statusOf(status) {
+  return statusMeta[status] || {
+    label: status || '—',
+    chip: 'border border-[#30363d] text-[#c9d1d9]',
+  }
 }
 
 const typeLabel = {
@@ -164,8 +171,8 @@ onMounted(load)
       <div class="mt-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <div class="flex flex-wrap items-center gap-2">
-            <span class="rounded px-2 py-0.5 text-xs font-semibold" :class="statusColor[item.status]">
-              {{ item.status }}
+            <span class="rounded-md px-2 py-0.5 text-xs font-semibold" :class="statusOf(item.status).chip">
+              {{ statusOf(item.status).label }}
             </span>
             <span class="text-xs text-banten-navy/50">{{ typeLabel[item.content_type] }}</span>
           </div>
@@ -185,7 +192,7 @@ onMounted(load)
             v-if="item.issue?.narrative_card || item.issue?.summary"
             class="issue-brief rounded-xl border border-banten-gold/30 bg-amber-50/60 p-5"
           >
-            <h2 class="issue-brief-title font-display text-lg">Acuan Mata Bathin</h2>
+            <h2 class="issue-brief-title font-display text-lg">Acuan narasi</h2>
             <p class="mt-2 whitespace-pre-wrap text-sm">
               {{ item.issue.narrative_card?.statement || item.issue.summary }}
             </p>

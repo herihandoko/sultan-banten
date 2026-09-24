@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from app.extensions import db
-from app.models import CrisisAlert, Issue
+from app.models import CrisisAlert, Issue, OpdValidation
 from app.services.messaging import send_whatsapp
 
 CRITICAL_LEVELS = {"R3", "R4", "R5"}
@@ -60,6 +60,90 @@ def create_crisis_alert(
         severity=severity,
         channels=["web", "whatsapp", "telegram"],
         delivery_status=delivery,
+        is_read=False,
+    )
+    db.session.add(alert)
+    db.session.flush()
+    return alert
+
+
+def notify_content_ready(issue: Issue) -> CrisisAlert | None:
+    """Web-only notice for editors once OPD verification moves an issue to producing.
+
+    Does not send WhatsApp or Telegram. Skips if an unread notice already exists.
+    """
+    existing = (
+        CrisisAlert.query.filter_by(
+            issue_id=issue.id,
+            alert_type="content_ready",
+            is_read=False,
+        )
+        .order_by(CrisisAlert.created_at.desc())
+        .first()
+    )
+    if existing:
+        return existing
+
+    rows = (
+        OpdValidation.query.filter_by(issue_id=issue.id, status="validated")
+        .order_by(OpdValidation.responded_at.desc())
+        .all()
+    )
+    names = []
+    note = ""
+    for row in rows:
+        if row.opd_name and row.opd_name not in names:
+            names.append(row.opd_name)
+        if not note and (row.response_notes or "").strip():
+            note = row.response_notes.strip()
+    who = ", ".join(names) if names else "OPD"
+    if note:
+        message = f"Validasi {who} selesai. Catatan OPD: {note}"
+    else:
+        message = f"Validasi {who} selesai. Berita ini menunggu naskah klarifikasi."
+    alert = CrisisAlert(
+        issue_id=issue.id,
+        alert_type="content_ready",
+        title=f"Siap dibuatkan konten: {issue.title}",
+        message=message,
+        risk_level=issue.risk_level,
+        severity="info",
+        channels=["web"],
+        delivery_status={"web": {"channel": "web", "status": "queued"}},
+        is_read=False,
+    )
+    db.session.add(alert)
+    db.session.flush()
+    return alert
+
+
+def notify_review_pending(issue: Issue, content) -> CrisisAlert | None:
+    """Web bell for pimpinan when an editor submits a draft for approval."""
+    existing = (
+        CrisisAlert.query.filter_by(
+            issue_id=issue.id if issue else None,
+            alert_type="content_review",
+            is_read=False,
+        )
+        .order_by(CrisisAlert.created_at.desc())
+        .all()
+    )
+    for row in existing:
+        if (row.delivery_status or {}).get("content_id") == content.id:
+            return row
+
+    alert = CrisisAlert(
+        issue_id=issue.id if issue else None,
+        alert_type="content_review",
+        title=f"Naskah menunggu persetujuan: {content.title}",
+        message="Editor mengajukan review. Buka naskah untuk menyetujui atau mengembalikan.",
+        risk_level=issue.risk_level if issue else None,
+        severity="info",
+        channels=["web"],
+        delivery_status={
+            "web": {"channel": "web", "status": "queued"},
+            "content_id": content.id,
+        },
         is_read=False,
     )
     db.session.add(alert)

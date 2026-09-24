@@ -24,6 +24,34 @@ const severityClass = {
   critical: 'bg-banten-red text-white',
 }
 
+const typeLabel = {
+  content_ready: 'Siap konten',
+  content_review: 'Perlu review',
+  risk_threshold: 'Risiko',
+  response_overdue: 'Terlambat',
+  manual: 'Manual',
+}
+
+function alertHref(alert) {
+  if (alert.href) return alert.href
+  if (alert.issue_id) return `/issues/${alert.issue_id}`
+  return ''
+}
+
+function formatAlertTime(iso) {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString('id-ID', {
+    timeZone: 'Asia/Jakarta',
+    day: 'numeric',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  })
+}
+
 async function loadAlerts() {
   loading.value = true
   try {
@@ -57,7 +85,8 @@ function notifyBrowser(alert) {
     })
     n.onclick = () => {
       window.focus()
-      if (alert.issue_id) router.push(`/issues/${alert.issue_id}`)
+      const href = alertHref(alert)
+      if (href) router.push(href)
       open.value = true
     }
   } catch {
@@ -72,15 +101,16 @@ async function enableWebPush() {
 }
 
 async function markRead(alert) {
+  const href = alertHref(alert)
   if (alert.is_read) {
-    if (alert.issue_id) router.push(`/issues/${alert.issue_id}`)
+    if (href) router.push(href)
     open.value = false
     return
   }
   await api.post(`/alerts/${alert.id}/read`)
   await loadAlerts()
-  if (alert.issue_id) {
-    router.push(`/issues/${alert.issue_id}`)
+  if (href) {
+    router.push(href)
     open.value = false
   }
 }
@@ -202,7 +232,7 @@ const badge = computed(() => (unreadCount.value > 9 ? '9+' : String(unreadCount.
           <p class="mt-1 text-sm font-medium text-white line-clamp-1">{{ a.title }}</p>
           <p class="mt-0.5 text-xs text-[#8b949e] line-clamp-2">{{ a.message }}</p>
           <p class="mt-1 text-[10px] text-[#6e7681]">
-            {{ a.alert_type }} · {{ a.created_at }}
+            {{ typeLabel[a.alert_type] || a.alert_type }} · {{ formatAlertTime(a.created_at) }}
           </p>
         </button>
       </div>

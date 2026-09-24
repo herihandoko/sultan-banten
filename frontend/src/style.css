@@ -333,35 +333,31 @@ html.dark .login-page {
   background: #0d1117;
 }
 
+.login-photo-overlay {
+  background: linear-gradient(
+    to bottom,
+    rgba(13, 17, 23, 0.35),
+    rgba(13, 17, 23, 0.28),
+    rgba(13, 17, 23, 0.62)
+  );
+}
+
 html.dark .login-photo-overlay {
   background: linear-gradient(
     to bottom,
-    rgba(13, 17, 23, 0.45),
-    rgba(13, 17, 23, 0.25),
+    rgba(13, 17, 23, 0.5),
+    rgba(13, 17, 23, 0.28),
     rgba(13, 17, 23, 0.72)
   ) !important;
   background-image: linear-gradient(
     to bottom,
-    rgba(13, 17, 23, 0.45),
-    rgba(13, 17, 23, 0.25),
+    rgba(13, 17, 23, 0.5),
+    rgba(13, 17, 23, 0.28),
     rgba(13, 17, 23, 0.72)
   ) !important;
 }
 
-html.dark .login-card {
-  background-color: rgba(22, 27, 34, 0.92) !important;
-  border-color: #30363d !important;
-  color: #c9d1d9;
-}
-
-html.dark .login-card label,
-html.dark .login-brand-title,
-html.dark .login-brand-sub {
-  color: #e6edf3 !important;
-}
-
-html.dark .login-card input {
-  background-color: #0d1117 !important;
-  border-color: #30363d !important;
-  color: #c9d1d9 !important;
+html.dark .login-panel,
+html.dark .login-input {
+  color: #e6edf3;
 }

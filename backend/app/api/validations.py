@@ -7,6 +7,7 @@ from flask_jwt_extended import jwt_required
 
 from app.extensions import db
 from app.models import AuditLog, Issue, OpdValidation, User
+from app.services.alerts import notify_content_ready
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
 from app.utils.project_scope import filter_query_by_issue_ids, request_project_id
@@ -44,16 +45,9 @@ def _validation_payload(item: OpdValidation, include_issue: bool = False) -> dic
 
 
 def _validation_url(validation_id: int) -> str:
-    import os
+    from app.services.role_notify import public_url
 
-    configured = (os.getenv("PUBLIC_APP_URL") or "").strip().rstrip("/")
-    if configured:
-        base = configured
-    else:
-        proto = (request.headers.get("X-Forwarded-Proto") or request.scheme or "http").split(",")[0].strip()
-        host = (request.headers.get("X-Forwarded-Host") or request.host or "").split(",")[0].strip()
-        base = f"{proto}://{host}".rstrip("/")
-    return f"{base}/validasi-opd?id={validation_id}"
+    return public_url(f"/validasi-opd?id={validation_id}")
 
 
 def _opd_admins(opd_name: str) -> list[User]:
@@ -293,6 +287,15 @@ def respond_validation(validation_id: int):
     if siblings and all(s.status != "waiting" for s in siblings):
         if any(s.status == "validated" for s in siblings):
             issue.status = "producing"
+            notify_content_ready(issue)
+            from app.services.role_notify import notify_editors_content_ready
+
+            try:
+                notify_editors_content_ready(issue)
+            except Exception:
+                from flask import current_app
+
+                current_app.logger.exception("Gagal mengirim notifikasi konten ke editor")
         else:
             issue.status = "open"
 

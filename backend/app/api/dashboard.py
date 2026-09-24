@@ -245,6 +245,7 @@ def _build_home(user, project_id: str | None) -> dict:
 
 def _home_admin(project_id, first):
     queue = _work_queue(project_id)
+    ready = _content_ready_queue(project_id)
     return {
         "layout": "monitor",
         "role": "super_admin",
@@ -255,22 +256,130 @@ def _home_admin(project_id, first):
         "tasks": queue["tasks"],
         "tasks_title": "Perlu ditindaklanjuti",
         "tasks_empty": "Tidak ada antrean yang mendesak.",
+        "content_queue": ready["items"],
+        "content_queue_count": ready["count"],
     }
 
 
 def _home_editor(project_id, first):
     queue = _work_queue(project_id)
+    ready = _content_ready_queue(project_id)
     return {
         "layout": "monitor",
         "role": "editor",
         "eyebrow": "Tim editor",
         "title": f"Pekerjaan hari ini, {first}",
-        "subtitle": "Naskah, validasi, dan isu yang masih perlu diselesaikan.",
+        "subtitle": "Berita yang baru diverifikasi OPD ada di antrean paling atas.",
         "cards": queue["cards"],
         "tasks": queue["tasks"],
         "tasks_title": "Antrean produksi",
         "tasks_empty": "Antrean produksi sedang kosong.",
+        "content_queue": ready["items"],
+        "content_queue_count": ready["count"],
     }
+
+
+def _content_ready_queue(project_id):
+    """Producing issues that still need a draft after the latest OPD verification."""
+    latest_content = (
+        db.session.query(
+            ContentItem.issue_id.label("issue_id"),
+            func.max(func.coalesce(ContentItem.updated_at, ContentItem.created_at)).label("content_at"),
+        )
+        .group_by(ContentItem.issue_id)
+        .subquery()
+    )
+    latest_val = (
+        db.session.query(
+            OpdValidation.issue_id.label("issue_id"),
+            func.max(OpdValidation.responded_at).label("validated_at"),
+        )
+        .filter(OpdValidation.status == "validated")
+        .group_by(OpdValidation.issue_id)
+        .subquery()
+    )
+    query = (
+        Issue.query.outerjoin(latest_content, latest_content.c.issue_id == Issue.id)
+        .outerjoin(latest_val, latest_val.c.issue_id == Issue.id)
+        .filter(Issue.status == "producing")
+        .filter(
+            db.or_(
+                latest_content.c.content_at.is_(None),
+                db.and_(
+                    latest_val.c.validated_at.isnot(None),
+                    latest_val.c.validated_at > latest_content.c.content_at,
+                ),
+            )
+        )
+    )
+    query = filter_issues_query(query, project_id)
+    query = query.filter(
+        db.or_(
+            Issue.mb_alert_id.is_(None),
+            ~Issue.mb_alert_id.ilike("SEED-%"),
+        )
+    )
+    count = query.count()
+    issues = query.order_by(Issue.updated_at.desc()).limit(8).all()
+    ids = [issue.id for issue in issues]
+    vals_by_issue: dict[int, list] = {}
+    contents_by_issue: dict[int, ContentItem] = {}
+    if ids:
+        for row in OpdValidation.query.filter(
+            OpdValidation.issue_id.in_(ids),
+            OpdValidation.status == "validated",
+        ).all():
+            vals_by_issue.setdefault(row.issue_id, []).append(row)
+        for item in (
+            ContentItem.query.filter(ContentItem.issue_id.in_(ids))
+            .order_by(ContentItem.updated_at.desc())
+            .all()
+        ):
+            contents_by_issue.setdefault(item.issue_id, item)
+    items = []
+    for issue in issues:
+        rows = vals_by_issue.get(issue.id) or []
+        names = []
+        note = ""
+        for row in rows:
+            if row.opd_name and row.opd_name not in names:
+                names.append(row.opd_name)
+            if not note and (row.response_notes or "").strip():
+                note = row.response_notes.strip()
+        meta = f"Diverifikasi · {', '.join(names)}" if names else "Sudah diverifikasi"
+        if note:
+            meta = f"{meta} · {note}"
+        existing = contents_by_issue.get(issue.id)
+        items.append(
+            {
+                "id": issue.id,
+                "title": issue.title,
+                "risk_level": issue.risk_level,
+                "meta": meta,
+                "ago": _relative_time(issue.updated_at or issue.created_at),
+                "href": f"/issues/{issue.id}",
+                "create_href": f"/konten?issue_id={issue.id}",
+                "existing_href": f"/konten/{existing.id}" if existing else None,
+                "existing_label": _existing_content_label(existing),
+            }
+        )
+    return {"count": count, "items": items}
+
+
+def _existing_content_label(item: ContentItem | None) -> str | None:
+    if not item:
+        return None
+    kind = {"text_release": "Rilis", "infographic": "Infografis", "video": "Video"}.get(
+        item.content_type, "Naskah"
+    )
+    state = {
+        "draft": "draf",
+        "in_review": "menunggu persetujuan",
+        "approved": "disetujui",
+        "rejected": "ditolak",
+        "published": "terbit",
+    }.get(item.status, item.status)
+    return f"Sudah ada {kind.lower()} · {state}"
 
 
 def _work_queue(project_id):

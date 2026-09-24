@@ -1,10 +1,12 @@
 """F.04 — Hub Konten Klarifikasi + approval."""
 
+from datetime import datetime, timezone
+
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required
 
 from app.extensions import db
-from app.models import AuditLog, ContentApproval, ContentItem, Issue
+from app.models import AuditLog, ContentApproval, ContentItem, CrisisAlert, Issue
 from app.utils.auth import get_current_user, role_required
 from app.utils.pagination import paginate
 from app.utils.project_scope import filter_issues_query, filter_query_by_issue_ids, request_project_id
@@ -157,6 +159,13 @@ def create_content():
     if issue.status in {"open", "validating", "producing"}:
         issue.status = "producing"
 
+    now = datetime.now(timezone.utc)
+    CrisisAlert.query.filter_by(
+        issue_id=issue.id,
+        alert_type="content_ready",
+        is_read=False,
+    ).update({"is_read": True, "read_at": now}, synchronize_session=False)
+
     db.session.flush()
     db.session.add(
         AuditLog(
@@ -225,6 +234,17 @@ def submit_for_review(content_id: int):
 
     item.status = "in_review"
     user = get_current_user()
+    from app.services.alerts import notify_review_pending
+    from app.services.role_notify import notify_pimpinan_review
+
+    if item.issue:
+        notify_review_pending(item.issue, item)
+    try:
+        notify_pimpinan_review(item, user)
+    except Exception:
+        from flask import current_app
+
+        current_app.logger.exception("Gagal mengirim notifikasi review ke pimpinan")
     db.session.add(
         AuditLog(
             user_id=user.id if user else None,

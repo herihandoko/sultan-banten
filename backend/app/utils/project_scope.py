@@ -99,6 +99,7 @@ def ensure_issue_project_id_column() -> None:
         db.session.execute(
             text("ALTER TABLE users ADD COLUMN IF NOT EXISTS phone VARCHAR(30)")
         )
+        db.session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar TEXT"))
         db.session.commit()
     except Exception:
         db.session.rollback()

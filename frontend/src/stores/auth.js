@@ -55,6 +55,14 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
+  async function updateProfile(payload) {
+    const { data } = await axios.patch('/api/auth/profile', payload, {
+      headers: { Authorization: `Bearer ${token.value}` },
+    })
+    user.value = data.user
+    return data.user
+  }
+
   async function logout() {
     const current = token.value
     // Clear local session immediately — never block UI/redirect on network
@@ -84,5 +92,6 @@ export const useAuthStore = defineStore('auth', () => {
     login,
     logout,
     bootstrap,
+    updateProfile,
   }
 })

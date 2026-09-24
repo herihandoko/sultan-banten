@@ -35,6 +35,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     full_name = db.Column(db.String(150), nullable=False)
     phone = db.Column(db.String(30))
+    avatar = db.Column(db.Text)
     role_id = db.Column(db.Integer, db.ForeignKey("roles.id"), nullable=False)
     opd_id = db.Column(db.Integer, db.ForeignKey("opds.id"), index=True)
     opd_name = db.Column(db.String(255))
@@ -57,8 +58,8 @@ class User(db.Model):
     def check_password(self, password: str) -> bool:
         return check_password_hash(self.password_hash, password)
 
-    def to_dict(self):
-        return {
+    def to_dict(self, include_avatar: bool = False):
+        data = {
             "id": self.id,
             "username": self.username,
             "email": self.email,
@@ -70,3 +71,6 @@ class User(db.Model):
             "is_active": self.is_active,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
+        if include_avatar:
+            data["avatar"] = self.avatar
+        return data
